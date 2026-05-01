@@ -113,36 +113,39 @@ const CustomerLayout = () => {
         </div>
       )}
 
-      <nav className="flex justify-between items-center p-6 lg:px-20 border-b border-gray-800 bg-[#12141A] sticky top-0 z-40 shadow-lg">
+            {/* HEADER TỔNG */}
+      <nav className="flex justify-between items-center p-4 lg:px-20 border-b border-gray-800 bg-[#12141A] sticky top-0 z-40 shadow-lg">
         <div 
           onClick={() => navigate('/')}
-          className="text-2xl font-black tracking-tighter bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent cursor-pointer"
+          className="text-xl md:text-2xl font-black tracking-tighter bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent cursor-pointer"
         >
           TICKETRUSH
         </div>
 
-        <div className="flex items-center gap-6 md:gap-8">
-          <div className="hidden md:flex gap-6">
-            <button 
-              onClick={() => {
-                if (!user) {
-                  alert("Vui lòng đăng nhập để tra cứu vé!");
-                  setIntendedRoute(null); 
-                  setShowAuth(true);
-                } else {
-                  setShowTicketHistory(true);
-                }
-              }}
-              className="text-white/90 hover:text-yellow-300 font-bold transition-colors uppercase text-sm tracking-widest"
-            >
-              Tra cứu vé
-            </button>
-          </div>
+        <div className="flex items-center gap-4 md:gap-8">
+          
+          {/* NÚT TRA CỨU VÉ: Hiện Icon 🎟️ trên Mobile, Hiện Chữ trên Desktop */}
+          <button 
+            onClick={() => {
+              if (!user) {
+                alert("Vui lòng đăng nhập để tra cứu vé!");
+                setIntendedRoute(null); 
+                setShowAuth(true);
+              } else {
+                setShowTicketHistory(true);
+              }
+            }}
+            className="text-white/90 hover:text-yellow-300 font-bold transition-colors flex items-center gap-2"
+            title="Tra cứu vé"
+          >
+            <span className="text-2xl md:hidden animate-pulse">🎟️</span>
+            <span className="hidden md:inline uppercase text-sm tracking-widest">Tra cứu vé</span>
+          </button>
 
           {user ? (
-            <div className="flex items-center gap-4 pl-2 md:pl-6 md:border-l border-white/20">
+            <div className="flex items-center gap-3 pl-3 md:pl-6 border-l border-gray-700">
               <span className="hidden md:block text-white/90 text-sm">Chào, <b className="text-yellow-300">{user.username}</b></span>
-              <button onClick={handleLogout} className="px-4 py-1.5 bg-red-900/50 hover:bg-red-600 border border-red-800/50 rounded-lg transition text-sm font-bold text-red-200 hover:text-white">
+              <button onClick={handleLogout} className="px-3 md:px-4 py-1.5 bg-red-900/50 hover:bg-red-600 border border-red-800/50 rounded-lg transition text-xs md:text-sm font-bold text-red-200 hover:text-white">
                 Đăng xuất
               </button>
             </div>
@@ -152,7 +155,7 @@ const CustomerLayout = () => {
                  setIntendedRoute(null);
                  setShowAuth(true);
                }} 
-               className="bg-yellow-400 hover:bg-yellow-500 text-black px-6 py-2 rounded-lg font-black transition shadow-[0_0_15px_rgba(250,204,21,0.3)] uppercase text-sm"
+               className="bg-yellow-400 hover:bg-yellow-500 text-black px-4 md:px-6 py-2 rounded-lg font-black transition shadow-[0_0_15px_rgba(250,204,21,0.3)] uppercase text-xs md:text-sm"
             >
               Đăng nhập
             </button>

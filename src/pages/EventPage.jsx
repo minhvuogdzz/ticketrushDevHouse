@@ -49,7 +49,7 @@ const EventPage = () => {
             {eventData?.name || 'ĐANG TẢI...'}
           </h1>
           <p className="text-xl md:text-2xl text-gray-300 font-light mb-10 max-w-3xl mx-auto leading-relaxed">
-            Kỷ niệm 80 năm Cách mạng Tháng Tám và Quốc khánh 2/9. Cùng hòa chung nhịp đập tự hào tại "Concert Quốc Gia" lớn nhất năm.
+            Kỷ niệm 51 năm Giải phóng miền Nam, thống nhất đất nước. Cùng hòa chung nhịp đập tự hào tại "Concert Quốc Gia" lớn nhất năm.
           </p>
           
           <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-12">
