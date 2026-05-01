@@ -57,7 +57,7 @@ const CustomerLayout = () => {
           onClick={() => navigate('/')}
           className="text-2xl font-black tracking-tighter bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent cursor-pointer"
         >
-          TICKETRUSH
+          NATIONAL CONCERT
         </div>
 
         <div className="flex items-center gap-6 md:gap-8">
