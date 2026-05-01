@@ -33,6 +33,41 @@ exports.lockSeat = async (req, res) => {
   }
 };
 
+// [Quyền Admin] Hủy vé đã bán và hoàn tiền
+exports.adminCancelTicket = async (req, res) => {
+  try {
+    const { seatId } = req.body;
+    
+    // Tìm ghế đang được bán
+    const seat = await Seat.findOne({ seatId });
+
+    if (!seat) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy ghế!' });
+    }
+    if (seat.status !== 'sold') {
+      return res.status(400).json({ success: false, message: 'Ghế này chưa được thanh toán thành công, không thể hoàn tiền!' });
+    }
+
+    // Reset toàn bộ thông tin ghế về trạng thái trống ban đầu
+    seat.status = 'available';
+    seat.lockedBy = null;
+    seat.lockExpires = null;
+    seat.customerName = null;
+    seat.customerPhone = null;
+    await seat.save();
+
+    // Bắn tín hiệu Socket cho toàn rạp (đổi màu vé thành xám)
+    if (req.io) {
+      req.io.emit('seatUpdated', seat); 
+    }
+
+    res.json({ success: true, message: `Đã hủy vé ${seatId} và hoàn tiền thành công!` });
+  } catch (error) {
+    console.error('Lỗi khi Admin hủy vé:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server khi xử lý hoàn tiền.' });
+  }
+};
+
 // Hàm tạo nhanh 150 ghế trống vào Database
 exports.seedSeats = async (req, res) => {
   try {
@@ -51,10 +86,37 @@ exports.seedSeats = async (req, res) => {
   }
 };
 
-// Hàm lấy toàn bộ danh sách ghế để hiển thị lên màn hình
+// Hàm lấy toàn bộ danh sách ghế & Tự động dọn vé hết hạn
 exports.getAllSeats = async (req, res) => {
   try {
-    const seats = await Seat.find().sort({ seatId: 1 }); // Sắp xếp theo ID
+    const now = new Date();
+
+    // 1. NGƯỜI QUÉT RÁC: Tìm tất cả các ghế đang giữ chỗ (locked) mà đã quá hạn 10 phút
+    const expiredSeats = await Seat.find({ status: 'locked', lockExpires: { $lt: now } });
+    
+    // Nếu có ghế quá hạn -> Giải phóng chúng ngay lập tức để người khác mua
+    if (expiredSeats.length > 0) {
+      await Seat.updateMany(
+        { status: 'locked', lockExpires: { $lt: now } },
+        { $set: { 
+            status: 'available', 
+            lockedBy: null, 
+            lockExpires: null,
+            customerName: null, 
+            customerPhone: null 
+          } 
+        }
+      );
+
+      // Bắn tín hiệu Socket cho toàn rạp biết các ghế này đã về màu xám
+      if (req.io) {
+        const resetSeats = await Seat.find({ _id: { $in: expiredSeats.map(s => s._id) } });
+        resetSeats.forEach(seat => req.io.emit('seatUpdated', seat));
+      }
+    }
+
+    // 2. Lấy danh sách ghế sạch sẽ nhất trả về cho Frontend
+    const seats = await Seat.find().populate('lockedBy', 'username').sort({ seatId: 1 });
     res.status(200).json(seats);
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -136,3 +198,84 @@ exports.unlockSeat = async (req, res) => {
   }
 };
 
+
+exports.unlockAllByUser = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    // Tìm các vé đang bị user này khóa
+    const seats = await Seat.find({ lockedBy: userId, status: 'locked' });
+    
+    if (seats.length > 0) {
+      // Mở khóa toàn bộ
+      await Seat.updateMany(
+        { lockedBy: userId, status: 'locked' },
+        { $set: { status: 'available', lockedBy: null, lockExpires: null } }
+      );
+
+      // Bắn socket cho rạp biết để đổi màu ghế
+      if (req.io) {
+        const resetSeats = await Seat.find({ _id: { $in: seats.map(s => s._id) } });
+        resetSeats.forEach(seat => req.io.emit('seatUpdated', seat));
+      }
+    }
+    
+    res.json({ success: true, message: 'Đã giải phóng vé của user' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi server' });
+  }
+};
+
+// [Quyền Admin] Cập nhật giá vé (Không xóa sơ đồ)
+exports.updatePrices = async (req, res) => {
+  try {
+    const { zones } = req.body;
+    // zones là mảng: [{ section: 'VIP', price: 800000 }, ...]
+    for (let zone of zones) {
+      await Seat.updateMany({ section: zone.section }, { $set: { price: Number(zone.price) } });
+    }
+    
+    // Bắn tín hiệu để toàn bộ client F5 lại giá mới
+    if (req.io) req.io.emit('seatUpdated', { type: 'RELOAD' }); 
+    
+    res.json({ success: true, message: 'Đã cập nhật giá vé thành công!' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Lỗi server khi cập nhật giá.' });
+  }
+};
+
+// [Quyền Admin] Tạo mới toàn bộ sơ đồ ghế (Danger Zone)
+exports.generateMap = async (req, res) => {
+  try {
+    const { zones } = req.body;
+    
+    // Xóa sạch dữ liệu ghế cũ
+    await Seat.deleteMany({}); 
+
+    const seatsToInsert = [];
+    zones.forEach(zone => {
+      // Thuật toán sinh ghế: Lặp Hàng -> Lặp Số ghế
+      for (let r = 1; r <= zone.rows; r++) {
+        for (let s = 1; s <= zone.seatsPerRow; s++) {
+          seatsToInsert.push({
+            seatId: `${zone.section}${r}-${s}`, // VD: VIP1-1, A2-5
+            section: zone.section,
+            row: r,
+            number: s,
+            price: zone.price,
+            status: 'available'
+          });
+        }
+      }
+    });
+
+    // Bulk insert để tối ưu hiệu suất tạo hàng nghìn vé 1 lúc
+    await Seat.insertMany(seatsToInsert);
+
+    if (req.io) req.io.emit('seatUpdated', { type: 'RELOAD' }); 
+    res.json({ success: true, message: 'Đã khởi tạo sơ đồ ghế thành công!' });
+  } catch (error) {
+    console.error("Lỗi generate map:", error);
+    res.status(500).json({ success: false, message: 'Lỗi server khi tạo sơ đồ.' });
+  }
+};

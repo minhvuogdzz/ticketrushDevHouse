@@ -12,5 +12,9 @@ router.post('/seed', seatController.seedSeats);
 router.post('/lock', seatController.lockSeat);
 router.post('/unlock', seatController.unlockSeat);
 router.post('/checkout', seatController.checkoutSeats);
+router.post('/unlock-all', seatController.unlockAllByUser);
+router.post('/admin/cancel', seatController.adminCancelTicket);
+router.post('/admin/update-prices', seatController.updatePrices);
+router.post('/admin/generate-map', seatController.generateMap);
 
 module.exports = router;

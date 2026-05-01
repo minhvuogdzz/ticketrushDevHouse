@@ -1,20 +1,31 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
+import axios from 'axios';
 
 const EventPage = () => {
   const navigate = useNavigate();
-  
-  // ĐÃ SỬA: Lấy thêm hàm setIntendedRoute từ Layout
   const { user, setShowAuth, setIntendedRoute } = useOutletContext() || {};
+  
+  // State lưu thông tin sự kiện lấy từ Database
+  const [eventData, setEventData] = useState(null);
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    // Lấy thông tin sự kiện từ Backend
+    const fetchEventData = async () => {
+      try {
+        const response = await axios.get('http://localhost:5001/api/event');
+        setEventData(response.data);
+      } catch (error) {
+        console.error("Lỗi tải thông tin sự kiện:", error);
+      }
+    };
+    fetchEventData();
   }, []);
 
   const handleBookingClick = () => {
     if (!user) {
       alert("Vui lòng đăng nhập hệ thống để có thể vào sơ đồ đặt vé!");
-      // ĐÃ SỬA: Cài đặt đích đến là Sơ đồ ghế trước khi bật form đăng nhập
       if (setIntendedRoute) setIntendedRoute('/event/1');
       if (setShowAuth) setShowAuth(true); 
     } else {
@@ -33,11 +44,12 @@ const EventPage = () => {
           <p className="text-yellow-500 font-bold tracking-[0.3em] uppercase mb-4 text-sm md:text-base drop-shadow-lg">
             Chương trình nghệ thuật chính luận
           </p>
+          {/* TÊN SỰ KIỆN ĐỘNG */}
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-yellow-500 to-yellow-700 uppercase tracking-tighter mb-6 filter drop-shadow-[0_0_20px_rgba(234,179,8,0.4)]">
-            Âm Vang Tổ Quốc
+            {eventData?.name || 'ĐANG TẢI...'}
           </h1>
           <p className="text-xl md:text-2xl text-gray-300 font-light mb-10 max-w-3xl mx-auto leading-relaxed">
-            Kỷ niệm 80 năm Cách mạng Tháng Tám và Quốc khánh 2/9. Cùng hòa chung nhịp đập tự hào tại "Concert Quốc Gia" lớn nhất năm 2025.
+            Kỷ niệm 80 năm Cách mạng Tháng Tám và Quốc khánh 2/9. Cùng hòa chung nhịp đập tự hào tại "Concert Quốc Gia" lớn nhất năm.
           </p>
           
           <div className="flex flex-col md:flex-row items-center justify-center gap-6 mb-12">
@@ -45,14 +57,16 @@ const EventPage = () => {
                <span className="text-2xl">⏰</span>
                <div className="text-left">
                   <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Thời gian</p>
-                  <p className="text-white font-bold">20:00 - 10.08.2025</p>
+                  {/* GIỜ & NGÀY ĐỘNG */}
+                  <p className="text-white font-bold">{eventData?.time || '--:--'} - {eventData?.date || '--.--.----'}</p>
                </div>
              </div>
              <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md px-6 py-3 rounded-full border border-gray-800">
                <span className="text-2xl">📍</span>
                <div className="text-left">
                   <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Địa điểm</p>
-                  <p className="text-white font-bold">SVĐ Quốc Gia Mỹ Đình</p>
+                  {/* ĐỊA ĐIỂM ĐỘNG */}
+                  <p className="text-white font-bold">{eventData?.location || 'Đang cập nhật'}</p>
                </div>
              </div>
           </div>
@@ -68,7 +82,7 @@ const EventPage = () => {
         <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#0a0a0a] to-transparent z-10"></div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-6 py-20 relative z-20">
+      <section className="w-full px-6 py-20 relative z-20">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
           <div className="bg-gradient-to-b from-gray-900 to-black p-8 rounded-3xl border border-gray-800 hover:border-red-900 transition-colors shadow-2xl">
             <div className="w-14 h-14 bg-red-950/50 rounded-2xl flex items-center justify-center text-3xl mb-6 border border-red-900/50">🔥</div>
@@ -81,14 +95,14 @@ const EventPage = () => {
             <div className="w-14 h-14 bg-yellow-950/50 rounded-2xl flex items-center justify-center text-3xl mb-6 border border-yellow-900/50">🇻🇳</div>
             <h3 className="text-2xl font-black text-white mb-4 uppercase">50.000 Trái Tim</h3>
             <p className="text-gray-400 leading-relaxed text-sm">
-              Dự kiến quy tụ 50.000 khán giả có mặt tại SVĐ Mỹ Đình để cùng hòa chung giọng hát Quốc ca, tạo nên khoảnh khắc lịch sử chấn động.
+              Dự kiến quy tụ 50.000 khán giả có mặt tại sân vận động để cùng hòa chung giọng hát Quốc ca, tạo nên khoảnh khắc lịch sử chấn động.
             </p>
           </div>
           <div className="bg-gradient-to-b from-gray-900 to-black p-8 rounded-3xl border border-gray-800 hover:border-blue-900 transition-colors shadow-2xl">
             <div className="w-14 h-14 bg-blue-950/50 rounded-2xl flex items-center justify-center text-3xl mb-6 border border-blue-900/50">📡</div>
             <h3 className="text-2xl font-black text-white mb-4 uppercase">Phủ Sóng Toàn Quốc</h3>
             <p className="text-gray-400 leading-relaxed text-sm">
-              Truyền hình trực tiếp trên kênh <b>Hanoi2</b> và tiếp sóng đồng loạt trên các đài địa phương, lan tỏa tinh thần dân tộc.
+              Truyền hình trực tiếp trên các kênh truyền hình lớn và tiếp sóng đồng loạt trên các đài địa phương, lan tỏa tinh thần dân tộc.
             </p>
           </div>
         </div>

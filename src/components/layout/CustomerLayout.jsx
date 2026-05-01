@@ -10,14 +10,54 @@ const CustomerLayout = () => {
   const [authMode, setAuthMode] = useState('login');
   const [authForm, setAuthForm] = useState({ username: '', password: '' });
   const [showTicketHistory, setShowTicketHistory] = useState(false); 
-
-  // ĐÃ THÊM: State ghi nhớ trang muốn đến sau khi đăng nhập
   const [intendedRoute, setIntendedRoute] = useState(null);
+
+  const [showSessionWarning, setShowSessionWarning] = useState(false);
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ticketrush_user');
     if (savedUser) setUser(JSON.parse(savedUser));
   }, []);
+
+  // --- LOGIC ĐỒNG HỒ NGẦM 10 PHÚT ---
+  useEffect(() => {
+    if (!user) return;
+
+    const interval = setInterval(() => {
+      const endTime = localStorage.getItem('ticketrush_session_end');
+      if (endTime) {
+        const remaining = Math.floor((parseInt(endTime) - Date.now()) / 1000);
+        
+        if (remaining === 60) {
+          setShowSessionWarning(true);
+        }
+        
+        if (remaining <= 0) {
+          clearInterval(interval);
+          handleForceLogout();
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [user]);
+
+  const handleForceLogout = async () => {
+    try {
+      await axios.post('http://localhost:5001/api/seats/unlock-all', { userId: user.userId });
+    } catch (error) {
+      console.error("Lỗi khi giải phóng vé:", error);
+    }
+
+    setShowSessionWarning(false);
+    setUser(null);
+    localStorage.removeItem('ticketrush_user');
+    localStorage.removeItem('ticketrush_session_end');
+    
+    alert("⏳ Đã hết 10 phút giao dịch! Hệ thống đã đăng xuất và thu hồi lại vé trong giỏ hàng để nhường cơ hội cho người khác.");
+    navigate('/');
+    window.location.reload(); 
+  };
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -28,12 +68,17 @@ const CustomerLayout = () => {
         const userData = { userId: response.data.userId, username: response.data.username, token: response.data.token };
         setUser(userData);
         localStorage.setItem('ticketrush_user', JSON.stringify(userData));
+        
+        // Bắt đầu tính giờ 10 phút từ lúc login (chỉ lưu phía client để hiển thị/cảnh báo)
+        // Còn việc thu hồi vé thực tế sẽ do Backend quét tự động sau 10 phút (Backend là nguồn chân lý)
+        const newEndTime = Date.now() + 600 * 1000;
+        localStorage.setItem('ticketrush_session_end', newEndTime.toString());
+
         setShowAuth(false);
         
-        // ĐÃ SỬA: Kiểm tra nếu có đích đến thì bay thẳng sang đó, không thì ở yên. (Bỏ reload trang cho mượt)
         if (intendedRoute) {
           navigate(intendedRoute);
-          setIntendedRoute(null); // Reset lại
+          setIntendedRoute(null); 
         }
       } else {
         alert('Đăng ký thành công! Vui lòng đăng nhập.');
@@ -45,19 +90,35 @@ const CustomerLayout = () => {
   };
 
   const handleLogout = () => {
+    // ĐÃ FIX BUG: Tuyệt đối KHÔNG gọi API unlock-all ở đây nữa!
+    // Vé của khách vẫn sẽ nằm an toàn trong Database.
     setUser(null);
     localStorage.removeItem('ticketrush_user');
+    localStorage.removeItem('ticketrush_session_end');
     navigate('/');
+    window.location.reload();
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0C10] text-white font-sans selection:bg-brand-secondary selection:text-white flex flex-col">
+    <div className="min-h-screen bg-[#0B0C10] text-white font-sans selection:bg-brand-secondary selection:text-white flex flex-col relative">
+      
+      {showSessionWarning && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[999] bg-red-600 text-white px-6 py-4 rounded-xl shadow-[0_0_30px_rgba(220,38,38,0.8)] border-2 border-red-400 flex items-center gap-4 animate-bounce">
+          <span className="text-3xl">⚠️</span>
+          <div>
+            <p className="font-black text-lg uppercase tracking-wider">Cảnh báo hết hạn phiên!</p>
+            <p className="text-sm">Bạn chỉ còn chưa đầy 1 phút để hoàn tất thanh toán. Hệ thống sẽ tự động đăng xuất.</p>
+          </div>
+          <button onClick={() => setShowSessionWarning(false)} className="ml-4 bg-black/30 hover:bg-black/50 p-2 rounded-lg font-bold text-xl">✕</button>
+        </div>
+      )}
+
       <nav className="flex justify-between items-center p-6 lg:px-20 border-b border-gray-800 bg-[#12141A] sticky top-0 z-40 shadow-lg">
         <div 
           onClick={() => navigate('/')}
           className="text-2xl font-black tracking-tighter bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent cursor-pointer"
         >
-          NATIONAL CONCERT
+          TICKETRUSH
         </div>
 
         <div className="flex items-center gap-6 md:gap-8">
@@ -66,7 +127,6 @@ const CustomerLayout = () => {
               onClick={() => {
                 if (!user) {
                   alert("Vui lòng đăng nhập để tra cứu vé!");
-                  // Bấm tra cứu vé mà chưa login thì lúc login xong cứ đứng ở trang hiện tại
                   setIntendedRoute(null); 
                   setShowAuth(true);
                 } else {
@@ -101,7 +161,6 @@ const CustomerLayout = () => {
       </nav>
 
       <main className="flex-1">
-        {/* ĐÃ SỬA: Truyền thêm hàm setIntendedRoute xuống cho các trang con */}
         <Outlet context={{ user, setShowAuth, setIntendedRoute }} />
       </main>
 
@@ -121,21 +180,11 @@ const CustomerLayout = () => {
             <form onSubmit={handleAuthSubmit} className="flex flex-col gap-5">
               <div>
                 <label className="block text-gray-400 text-sm font-medium mb-2">Tên tài khoản</label>
-                <input 
-                  type="text" required
-                  className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-yellow-500 transition"
-                  value={authForm.username}
-                  onChange={(e) => setAuthForm({...authForm, username: e.target.value})}
-                />
+                <input type="text" required className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-yellow-500 transition" value={authForm.username} onChange={(e) => setAuthForm({...authForm, username: e.target.value})}/>
               </div>
               <div>
                 <label className="block text-gray-400 text-sm font-medium mb-2">Mật khẩu</label>
-                <input 
-                  type="password" required
-                  className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-yellow-500 transition"
-                  value={authForm.password}
-                  onChange={(e) => setAuthForm({...authForm, password: e.target.value})}
-                />
+                <input type="password" required className="w-full bg-gray-800 border border-gray-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-yellow-500 transition" value={authForm.password} onChange={(e) => setAuthForm({...authForm, password: e.target.value})}/>
               </div>
               <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3.5 rounded-lg mt-2 transition shadow-[0_0_15px_rgba(234,179,8,0.3)]">
                 {authMode === 'login' ? 'Xác nhận' : 'Tạo tài khoản'}

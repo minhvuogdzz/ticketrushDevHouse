@@ -79,7 +79,7 @@ const EventDetailPage = () => {
       </div>
 
       {/* NỘI DUNG CHÍNH (Sơ đồ ghế) */}
-      <div className="max-w-7xl mx-auto px-4 mt-8 md:mt-12">
+      <div className="w-full mx-auto px-10 mt-8 md:mt-12">
         {!user ? (
           <div className="text-center py-20 bg-gray-900/50 rounded-2xl border border-gray-800 backdrop-blur-sm shadow-xl">
             <div className="text-5xl mb-4">🎟️</div>

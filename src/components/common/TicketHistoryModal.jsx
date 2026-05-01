@@ -46,13 +46,24 @@ const TicketHistoryModal = ({ isOpen, onClose, user }) => {
   useEffect(() => {
     if (!isOpen || !user) return;
 
-    const fetchTickets = async () => {
+      const fetchTickets = async () => {
       setIsLoading(true);
       try {
         const response = await axios.get('http://localhost:5001/api/seats');
-        const userTickets = response.data.filter(seat => 
-          seat.lockedBy === user.userId && (seat.status === 'locked' || seat.status === 'sold')
-        );
+        
+        // ĐÃ FIX: ÉP KIỂU STRING ĐỂ SO SÁNH CHÍNH XÁC 100%
+        const userTickets = response.data.filter(seat => {
+          if (!seat.lockedBy || !user || !user.userId) return false;
+          
+          // Trích xuất ID an toàn dù nó là Object hay String
+          const ownerId = seat.lockedBy._id || seat.lockedBy; 
+          
+          // So sánh bằng cách ép kiểu String
+          const isMine = String(ownerId) === String(user.userId);
+          
+          return isMine && (seat.status === 'locked' || seat.status === 'sold');
+        });
+        
         setMyTickets(userTickets);
       } catch (error) {
         console.error('Lỗi tải lịch sử vé:', error);

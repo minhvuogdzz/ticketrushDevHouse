@@ -54,3 +54,7 @@ const PORT = process.env.PORT || 5001;
 server.listen(PORT, () => {
   console.log(`🚀 Server Backend chạy tại cổng ${PORT} & Socket.io đã sẵn sàng!`);
 });
+
+const eventController = require('./controllers/eventController');
+app.get('/api/event', eventController.getEventInfo);
+app.post('/api/event/update', eventController.updateEventInfo);
