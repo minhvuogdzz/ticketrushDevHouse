@@ -1,18 +1,33 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import CustomerLayout from './components/layout/CustomerLayout';
-import './App.css'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+
+// Import Layout chung
+import CustomerLayout from "./components/layout/CustomerLayout";
+
+// Import các Trang con
+import EventPage from './pages/EventPage'; // NHỚ IMPORT TRANG SỰ KIỆN VÀO ĐÂY
+import EventDetailPage from './pages/customer/EventDetailPage'; 
+import WaitingRoomPage from './pages/customer/WaitingRoomPage';
 
 function App() {
   return (
-    <CustomerLayout>
-      <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-gray-700 rounded-xl">
-        <h1 className="text-4xl font-bold mb-4">Chào mừng đến với TicketRush</h1>
-        <p className="text-gray-400">Dev House thiếu 2 thằng l Lâm Hải!</p>
-      </div>
-    </CustomerLayout>
+    <Router>
+      <Routes>
+        {/* Layout dùng chung cho Khách hàng */}
+        <Route path="/" element={<CustomerLayout />}>
+          
+          {/* ĐÃ SỬA: Mặc định vào web (route '/') sẽ hiện trang Landing Sự Kiện */}
+          <Route index element={<EventPage />} />
+          
+          {/* Trang Chi tiết sự kiện (Có sơ đồ ghế) */}
+          <Route path="event/:id" element={<EventDetailPage />} />
+          
+          {/* Trang Hàng chờ ảo */}
+          <Route path="waiting-room" element={<WaitingRoomPage />} />
+          
+        </Route>
+      </Routes>
+    </Router>
   );
 }
 
