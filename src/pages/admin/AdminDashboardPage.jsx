@@ -35,7 +35,6 @@ const AdminDashboardPage = () => {
     // SOCKET LẮNG NGHE REAL-TIME
     const socket = io('http://localhost:5001');
     socket.on('seatUpdated', () => {
-      // Reload lại danh sách vé để lấy data mới nhất (có populate user)
       axios.get('http://localhost:5001/api/seats').then(res => setSeats(res.data));
     });
 
@@ -63,36 +62,53 @@ const AdminDashboardPage = () => {
     }
   };
 
-  // TÍNH TOÁN THỐNG KÊ
+  // TÍNH TOÁN THỐNG KÊ CHUNG
   const totalSeats = seats.length;
   const soldSeats = seats.filter(s => s.status === 'sold').reverse();
   const lockedSeats = seats.filter(s => s.status === 'locked');
   
   const totalRevenue = soldSeats.reduce((sum, seat) => sum + seat.price, 0);
   const occupancyRate = totalSeats > 0 ? Math.round((soldSeats.length / totalSeats) * 100) : 0;
+  const totalSold = soldSeats.length; 
 
-  const totalSold = soldSeats.length || 1; 
-  const vipCount = soldSeats.filter(s => s.section === 'VIP').length;
-  const abCount = soldSeats.filter(s => ['A', 'B'].includes(s.section)).length;
-  const cdCount = soldSeats.filter(s => ['C', 'D'].includes(s.section)).length;
+  // ================= TÍNH TOÁN THỐNG KÊ ĐỘNG TỪNG KHU VỰC =================
+  const eventZones = eventInfo.zones || [];
+  
+  // Bảng màu tự động xoay vòng cho các khu vực
+  const DYNAMIC_COLORS = [
+    { from: 'from-yellow-600', to: 'to-yellow-400', text: 'text-yellow-400' },
+    { from: 'from-blue-700', to: 'to-blue-400', text: 'text-blue-400' },
+    { from: 'from-green-700', to: 'to-green-400', text: 'text-green-400' },
+    { from: 'from-purple-700', to: 'to-purple-400', text: 'text-purple-400' },
+    { from: 'from-pink-700', to: 'to-pink-400', text: 'text-pink-400' },
+    { from: 'from-teal-700', to: 'to-teal-400', text: 'text-teal-400' },
+  ];
 
-  const vipPct = Math.round((vipCount / totalSold) * 100);
-  const abPct = Math.round((abCount / totalSold) * 100);
-  const cdPct = Math.round((cdCount / totalSold) * 100);
+  const dynamicZoneStats = eventZones.map((zone, index) => {
+    const count = soldSeats.filter(s => s.section === zone.section).length;
+    const pct = totalSold === 0 ? 0 : Math.round((count / totalSold) * 100);
+    const color = DYNAMIC_COLORS[index % DYNAMIC_COLORS.length];
+    
+    return {
+      section: zone.section,
+      name: zone.name,
+      count,
+      pct,
+      color
+    };
+  });
 
   if (isLoading) return <div className="min-h-screen bg-[#0B0C10] flex items-center justify-center text-yellow-500"><div className="animate-spin text-4xl">⏳</div></div>;
 
   return (
     <div className="min-h-screen bg-[#0B0C10] text-gray-200 font-sans flex flex-col md:flex-row relative">
       
-      {/* POP-UP XÁC NHẬN HỦY VÉ & HOÀN TIỀN */}
+      {/* POP-UP XÁC NHẬN HỦY VÉ */}
       {ticketToCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-fade-in">
              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-full bg-red-900/50 text-red-500 flex items-center justify-center text-2xl border border-red-500/30">
-                  ⚠️
-                </div>
+                <div className="w-12 h-12 rounded-full bg-red-900/50 text-red-500 flex items-center justify-center text-2xl border border-red-500/30">⚠️</div>
                 <div>
                   <h3 className="text-xl font-black text-white uppercase">Xác nhận Hủy Vé</h3>
                   <p className="text-sm text-gray-400">Thao tác này không thể hoàn tác!</p>
@@ -115,18 +131,8 @@ const AdminDashboardPage = () => {
              </div>
 
              <div className="flex gap-3">
-               <button 
-                 onClick={() => setTicketToCancel(null)}
-                 disabled={isProcessingRefund}
-                 className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-xl font-bold transition disabled:opacity-50"
-               >
-                 Hủy bỏ
-               </button>
-               <button 
-                 onClick={confirmCancelTicket}
-                 disabled={isProcessingRefund}
-                 className="flex-1 bg-red-600 hover:bg-red-500 text-white py-3 rounded-xl font-black transition flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(220,38,38,0.5)] disabled:opacity-50"
-               >
+               <button onClick={() => setTicketToCancel(null)} disabled={isProcessingRefund} className="flex-1 bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-xl font-bold transition disabled:opacity-50">Hủy bỏ</button>
+               <button onClick={confirmCancelTicket} disabled={isProcessingRefund} className="flex-1 bg-red-600 hover:bg-red-500 text-white py-3 rounded-xl font-black transition flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(220,38,38,0.5)] disabled:opacity-50">
                  {isProcessingRefund ? <span className="animate-spin border-2 border-white border-t-transparent w-5 h-5 rounded-full"></span> : 'Hoàn tiền & Xóa'}
                </button>
              </div>
@@ -154,7 +160,6 @@ const AdminDashboardPage = () => {
         <header className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight">Real-time Dashboard</h1>
-            {/* TÊN SỰ KIỆN ĐỘNG THEO DB */}
             <p className="text-gray-400 text-sm mt-1">Sự kiện: <b className="text-yellow-400">{eventInfo?.name || 'Đang tải...'}</b></p>
           </div>
           <div className="flex items-center gap-2 bg-green-500/10 text-green-400 px-3 py-1.5 rounded-full border border-green-500/30 text-xs font-bold animate-pulse">
@@ -226,7 +231,6 @@ const AdminDashboardPage = () => {
                         </td>
                         <td className="py-3 text-right font-bold text-green-400">{c.price.toLocaleString('vi-VN')} đ</td>
                         
-                        {/* CỘT THAO TÁC: NÚT HỦY VÉ */}
                         <td className="py-3 text-center">
                            <button 
                              onClick={() => setTicketToCancel(c)}
@@ -243,61 +247,41 @@ const AdminDashboardPage = () => {
             </div>
           </div>
 
-          {/* CỘT PHẢI: THỐNG KÊ TỶ LỆ HẠNG VÉ */}
+          {/* CỘT PHẢI: THỐNG KÊ TỶ LỆ HẠNG VÉ ĐỘNG */}
           <div className="bg-[#12141A] rounded-2xl border border-gray-800 p-6 shadow-xl flex flex-col h-[550px]">
              <h2 className="text-xl font-black text-white mb-2 uppercase">Cơ cấu hạng vé</h2>
              <p className="text-gray-500 text-xs mb-8">Tỷ lệ phần trăm các khu vực vé đã bán ra so với tổng doanh số.</p>
              
-             <div className="flex-1 flex flex-col gap-8 justify-center">
-                <div>
-                   <div className="flex justify-between items-end mb-2">
-                     <div>
-                       <span className="text-yellow-400 font-black text-lg">VIP</span>
-                       <p className="text-xs text-gray-500 mt-1">Khu vực trung tâm</p>
-                     </div>
-                     <div className="text-right">
-                       <span className="text-xl font-black text-white">{vipPct}%</span>
-                       <p className="text-xs text-gray-500 mt-1">{vipCount} vé</p>
-                     </div>
-                   </div>
-                   <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
-                     <div className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400 transition-all duration-1000" style={{ width: `${vipPct}%` }}></div>
-                   </div>
-                </div>
-
-                <div>
-                   <div className="flex justify-between items-end mb-2">
-                     <div>
-                       <span className="text-blue-400 font-black text-lg">Khán đài A, B</span>
-                       <p className="text-xs text-gray-500 mt-1">Góc nhìn hai bên hông</p>
-                     </div>
-                     <div className="text-right">
-                       <span className="text-xl font-black text-white">{abPct}%</span>
-                       <p className="text-xs text-gray-500 mt-1">{abCount} vé</p>
-                     </div>
-                   </div>
-                   <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
-                     <div className="h-full bg-gradient-to-r from-blue-700 to-blue-400 transition-all duration-1000" style={{ width: `${abPct}%` }}></div>
-                   </div>
-                </div>
-
-                <div>
-                   <div className="flex justify-between items-end mb-2">
-                     <div>
-                       <span className="text-green-400 font-black text-lg">Khán đài C, D</span>
-                       <p className="text-xs text-gray-500 mt-1">Khu vực tiêu chuẩn (Phía sau)</p>
-                     </div>
-                     <div className="text-right">
-                       <span className="text-xl font-black text-white">{cdPct}%</span>
-                       <p className="text-xs text-gray-500 mt-1">{cdCount} vé</p>
-                     </div>
-                   </div>
-                   <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
-                     <div className="h-full bg-gradient-to-r from-green-700 to-green-400 transition-all duration-1000" style={{ width: `${cdPct}%` }}></div>
-                   </div>
-                </div>
+             <div className="flex-1 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
+                {eventZones.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-gray-600 italic">
+                    Chưa có cấu hình khu vực nào.
+                  </div>
+                ) : (
+                  dynamicZoneStats.map((stat) => (
+                    <div key={stat.section}>
+                       <div className="flex justify-between items-end mb-2">
+                         <div>
+                           <span className={`font-black text-lg ${stat.color.text}`}>{stat.name}</span>
+                           <p className="text-xs text-gray-500 mt-1">Mã khu: {stat.section}</p>
+                         </div>
+                         <div className="text-right">
+                           <span className="text-xl font-black text-white">{stat.pct}%</span>
+                           <p className="text-xs text-gray-500 mt-1">{stat.count} vé</p>
+                         </div>
+                       </div>
+                       <div className="w-full h-3 bg-gray-800 rounded-full overflow-hidden">
+                         <div 
+                           className={`h-full bg-gradient-to-r ${stat.color.from} ${stat.color.to} transition-all duration-1000`} 
+                           style={{ width: `${stat.pct}%` }}
+                         ></div>
+                       </div>
+                    </div>
+                  ))
+                )}
              </div>
           </div>
+          
         </div>
       </main>
     </div>

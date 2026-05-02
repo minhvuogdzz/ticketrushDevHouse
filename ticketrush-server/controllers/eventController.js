@@ -23,11 +23,14 @@ exports.getEventInfo = async (req, res) => {
 
 exports.updateEventInfo = async (req, res) => {
   try {
-    const { name, date, time, location, zones, layout, gridRows, gridCols } = req.body;
+    // Thêm description vào req.body
+    const { name, description, date, time, location, zones, layout, gridRows, gridCols } = req.body;
+    
     let event = await Event.findOne().sort({ _id: -1 });
     if (!event) event = new Event();
 
     if (name !== undefined) event.name = name;
+    if (description !== undefined) event.description = description; // Đã thêm
     if (date !== undefined) event.date = date;
     if (time !== undefined) event.time = time;
     if (location !== undefined) event.location = location;
@@ -39,6 +42,7 @@ exports.updateEventInfo = async (req, res) => {
     await event.save();
     res.json({ success: true, event });
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi cập nhật' });
+    console.error("Lỗi update event:", error);
+    res.status(500).json({ message: 'Lỗi khi lưu thông tin sự kiện' });
   }
 };

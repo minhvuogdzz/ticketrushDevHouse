@@ -1,101 +1,133 @@
-import React, { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import SeatMatrix from '../../components/SeatMap/SeatMatrix';
+// src/pages/customer/EventDetailPage.jsx
 
-// Import ảnh cờ từ thư mục local
-import flagImg from '../../assets/image/co.jpg';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
+import SeatMatrix from '../../components/SeatMap/SeatMatrix'; 
+import eventHeaderBg from '../../assets/image/co.jpg';
 
 const EventDetailPage = () => {
-  const { user, setShowAuth } = useOutletContext();
+  // eslint-disable-next-line no-unused-vars
+  const { id } = useParams();
+  // eslint-disable-next-line no-unused-vars
   const navigate = useNavigate();
-  const [isAllowed, setIsAllowed] = useState(false);
-  const [checkingQueue, setCheckingQueue] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const { user } = useOutletContext() || {};
+  
+  const [eventData, setEventData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
-    
-    const joinQueue = async () => {
-      setCheckingQueue(true);
+    window.scrollTo(0, 0);
+    const fetchEventInfo = async () => {
       try {
-        const response = await axios.post('http://localhost:5001/api/queue/join', { userId: user.userId });
-        if (response.data.allowed) {
-          setIsAllowed(true);
-        } else {
-          // Rạp đông, đẩy sang trang Waiting Room kèm theo vị trí
-          navigate('/waiting-room', { state: { position: response.data.position } });
-        }
+        const response = await axios.get('http://localhost:5001/api/event');
+        setEventData(response.data);
       } catch (error) {
-        console.error('Lỗi khi vào hàng chờ:', error);
+        console.error("Lỗi khi tải thông tin sự kiện:", error);
       } finally {
-        setCheckingQueue(false);
+        setIsLoading(false);
       }
     };
+    fetchEventInfo();
+  }, []);
 
-    joinQueue();
-  }, [user, navigate]);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-yellow-500">
+        <div className="animate-spin text-4xl">⏳</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="pb-20 bg-[#0B0C10] min-h-screen">
-      {/* EVENT HERO SECTION - CỜ PHỦ KÍN BACKGROUND */}
-      <div className="relative w-full h-[50vh] md:h-[65vh] flex items-center justify-center overflow-hidden border-b-4 border-yellow-500/80 shadow-[0_10px_40px_rgba(220,38,38,0.2)]">
+    <div className="min-h-screen bg-[#0a0a0a] text-gray-200 font-sans pb-20">
+      {/* HEADER CHI TIẾT SỰ KIỆN */}
+      {/* Đổi h-[40vh] thành h-screen để cao tràn full màn hình */}
+      <div className="relative w-full h-screen overflow-hidden bg-[#0a0a0a]">
         
-        {/* Lớp nền màu tối (gradient) chèn lên trên cờ để chữ dễ đọc hơn */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0B0C10]/40 via-[#0B0C10]/70 to-[#0B0C10] z-10"></div>
+        {/* ẢNH NỀN: inset-0, w-full, h-full, object-cover để tràn mọi góc độ */}
+        <img 
+          src={eventHeaderBg} 
+          alt="Event Background" 
+          className="absolute inset-0 w-full h-full object-cover opacity-80 z-0" 
+        />
+
+        {/* Lớp phủ gradient tối để dễ đọc chữ */}
+        <div className="absolute inset-0 bg-black/40 z-10"></div>
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0a0a0a]/80 to-[#0a0a0a] z-10"></div>
         
-        {/* LÁ CỜ LÀM BACKGROUND PHỦ TOÀN BỘ */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center z-0 opacity-80"
-          style={{ backgroundImage: `url(${flagImg})` }}
-        ></div>
-        
-        {/* Nội dung text nằm đè lên trên cờ */}
-        <div className="relative z-20 text-center px-4 max-w-5xl mx-auto flex flex-col items-center mt-8">
-          <span className="px-6 py-1.5 border border-yellow-500/50 text-yellow-400 rounded-full text-xs md:text-sm font-bold tracking-[0.2em] uppercase mb-6 bg-red-950/70 backdrop-blur-md shadow-lg">
-            Concert Quốc Gia
-          </span>
+        {/* Căn lề padding px-10 cho đồng bộ với phần sơ đồ bên dưới */}
+        <div className="relative z-20 w-full px-4 md:px-10 h-full flex flex-col justify-end pb-16">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+             <span className="bg-yellow-500 text-black px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(234,179,8,0.4)]">
+               Live Concert
+             </span>
+          </div>
           
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-black mb-4 uppercase tracking-tighter text-yellow-400 drop-shadow-[0_4px_20px_rgba(250,204,21,0.5)]">
-            Âm Vang Tổ Quốc
+          <h1 className="text-4xl md:text-7xl lg:text-8xl font-black text-white uppercase tracking-tighter mb-4 drop-shadow-2xl">
+            {eventData?.name || 'CHƯA CẬP NHẬT'}
           </h1>
           
-          <p className="text-gray-100 text-sm md:text-lg font-medium mb-10 max-w-2xl leading-relaxed drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] px-4">
-            Chào mừng Kỷ niệm <span className="text-yellow-400 font-bold text-xl md:text-2xl mx-1">51 năm</span> Ngày Giải phóng miền Nam, thống nhất đất nước <br className="hidden md:block" />
-            <span className="text-yellow-500 text-xs md:text-sm tracking-widest font-bold">(30/04/1975 - 30/04/2026)</span>
-          </p>
-          
-          <div className="flex flex-wrap justify-center items-center gap-4 md:gap-8 text-yellow-100 font-semibold text-sm md:text-base bg-black/60 py-4 px-6 md:px-10 rounded-2xl backdrop-blur-md border border-yellow-600/30 shadow-[0_0_20px_rgba(0,0,0,0.5)]">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">📅</span> 
-              <span>20:00 - 30/04/2026</span>
+          <div className="flex flex-wrap gap-6 text-sm md:text-lg text-gray-300 font-medium">
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-500">⏰</span> {eventData?.time || '--:--'} | {eventData?.date || '--.--.----'}
             </div>
-            <div className="hidden md:block w-px h-6 bg-yellow-600/50"></div>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">📍</span> 
-              <span>Sân vận động Quốc gia Mỹ Đình</span>
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-500">📍</span> {eventData?.location || 'Đang cập nhật địa điểm...'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* NỘI DUNG CHÍNH (Sơ đồ ghế) */}
-      <div className="w-full mx-auto px-10 mt-8 md:mt-12">
-        {!user ? (
-          <div className="text-center py-20 bg-gray-900/50 rounded-2xl border border-gray-800 backdrop-blur-sm shadow-xl">
-            <div className="text-5xl mb-4">🎟️</div>
-            <h2 className="text-2xl mb-6 font-semibold text-gray-200">Vui lòng đăng nhập để tham gia mua vé</h2>
-            <button onClick={() => setShowAuth(true)} className="bg-gradient-to-r from-red-600 to-red-800 hover:from-red-500 hover:to-red-700 text-white px-10 py-4 rounded-xl font-bold text-lg transition shadow-[0_0_20px_rgba(220,38,38,0.4)]">
-              Đăng nhập ngay
-            </button>
+      {/* NỘI DUNG CHÍNH: SƠ ĐỒ GHẾ & GIỎ HÀNG */}
+      <div className="w-full px-4 md:px-10 mt-8">
+        <div className="flex flex-col gap-8">
+          
+          {/* Banner thông báo đếm ngược */}
+          <div className="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+             <div className="flex items-center gap-4 text-center md:text-left">
+                <div className="text-3xl">🛡️</div>
+                <div>
+                   <h4 className="text-white font-black uppercase text-sm">Hệ thống giữ chỗ thông minh</h4>
+                   <p className="text-gray-400 text-xs mt-1">Sau khi chọn ghế, bạn có 10 phút để hoàn tất thanh toán trước khi ghế được nhả ra cho người khác.</p>
+                </div>
+             </div>
+             <div className="bg-black/40 px-6 py-2 rounded-xl border border-gray-700">
+                <p className="text-[10px] text-gray-500 uppercase font-bold text-center">Trạng thái kết nối</p>
+                <p className="text-green-500 font-black text-xs text-center animate-pulse">● ĐANG TRỰC TUYẾN</p>
+             </div>
           </div>
-        ) : checkingQueue ? (
-          <div className="text-center py-20 bg-gray-900/50 rounded-2xl border border-gray-800 backdrop-blur-sm">
-            <div className="w-14 h-14 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-            <p className="text-gray-300 font-medium text-lg animate-pulse">Đang kiểm tra kết nối rạp...</p>
+
+          {/* COMPONENT SƠ ĐỒ GHẾ */}
+          <div className="animate-fade-in-up">
+            <SeatMatrix 
+              eventData={eventData} 
+              eventZones={eventData?.zones || []} 
+            />
           </div>
-        ) : isAllowed ? (
-          <SeatMatrix user={user} />
-        ) : null}
+
+          {/* PHẦN CHÚ THÍCH & HỖ TRỢ KỸ THUẬT */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10 border-t border-gray-800 pt-10">
+             <div>
+                <h3 className="text-xl font-black text-white uppercase mb-4">Lưu ý khi mua vé</h3>
+                <ul className="space-y-3 text-sm text-gray-400">
+                   <li className="flex gap-3"><span className="text-yellow-500">✓</span> Mỗi tài khoản có thể chọn nhiều ghế cùng lúc.</li>
+                   <li className="flex gap-3"><span className="text-yellow-500">✓</span> Vui lòng kiểm tra kỹ thông tin Họ tên & SĐT trước khi quét mã QR.</li>
+                   <li className="flex gap-3"><span className="text-yellow-500">✓</span> Vé điện tử sẽ được lưu trong mục "Tra cứu vé" ngay sau khi thanh toán.</li>
+                </ul>
+             </div>
+             <div className="bg-[#12141A] p-6 rounded-2xl border border-gray-800">
+                <h3 className="text-lg font-black text-white uppercase mb-2">Hỗ trợ kỹ thuật</h3>
+                <p className="text-sm text-gray-500 mb-4">Nếu gặp sự cố trong quá trình thanh toán hoặc không nhận được vé, vui lòng liên hệ hotline:</p>
+                <div className="flex items-center gap-4">
+                   <div className="bg-yellow-500 text-black px-4 py-2 rounded-lg font-black tracking-tighter">1900 8888</div>
+                   <div className="text-xs text-gray-400">Hỗ trợ 24/7</div>
+                </div>
+             </div>
+          </div>
+
+        </div>
       </div>
     </div>
   );

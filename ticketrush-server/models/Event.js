@@ -2,12 +2,12 @@ const mongoose = require('mongoose');
 
 const eventSchema = new mongoose.Schema({
   name: { type: String, default: 'ÂM VANG TỔ QUỐC' },
+  description: { type: String, default: 'Kỷ niệm 51 năm Giải phóng miền Nam, thống nhất đất nước. Cùng hòa chung nhịp đập tự hào tại "Concert Quốc Gia" lớn nhất năm.' },
   date: { type: String, default: '10.08.2025' },
   time: { type: String, default: '20:00' },
   location: { type: String, default: 'SVĐ Quốc Gia Mỹ Đình' },
   zones: { type: Array, default: [] },
   layout: { type: Array, default: [null, 'VIP', null, 'A', null, 'B', 'C', null, 'D'] },
-  // ĐÃ THÊM: Kích thước lưới kéo thả
   gridRows: { type: Number, default: 3 },
   gridCols: { type: Number, default: 3 }
 });

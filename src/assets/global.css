@@ -2,8 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Thiết lập màu sắc thủ công cho body */
 body {
-  background-color: #0f172a; /* Nền tối brand-dark */
-  color: #f8fafc; /* Chữ sáng brand-light */
+  background-color: #ad5555; 
+  color: #7b7b7b; 
 }
