@@ -15,7 +15,7 @@ const startQueueWorker = require('./workers/queueWorker');
 const app = express();
 const server = http.createServer(app);
 
-// --- 2. CẤU HÌNH SOCKET.IO ---
+// --- 2. SOCKET.IO ---
 const io = new Server(server, {
   cors: {
     origin: "http://localhost:5173", 

@@ -65,12 +65,16 @@ const CustomerLayout = () => {
     try {
       const response = await axios.post(`http://localhost:5001${endpoint}`, authForm);
       if (authMode === 'login') {
-        const userData = { userId: response.data.userId, username: response.data.username, token: response.data.token };
+        // Lấy thêm trường role từ backend trả về để lưu vào state
+        const userData = { 
+          userId: response.data.userId, 
+          username: response.data.username, 
+          token: response.data.token,
+          role: response.data.role 
+        };
         setUser(userData);
         localStorage.setItem('ticketrush_user', JSON.stringify(userData));
         
-        // Bắt đầu tính giờ 10 phút từ lúc login (chỉ lưu phía client để hiển thị/cảnh báo)
-        // Còn việc thu hồi vé thực tế sẽ do Backend quét tự động sau 10 phút (Backend là nguồn chân lý)
         const newEndTime = Date.now() + 600 * 1000;
         localStorage.setItem('ticketrush_session_end', newEndTime.toString());
 
@@ -90,14 +94,15 @@ const CustomerLayout = () => {
   };
 
   const handleLogout = () => {
-    // ĐÃ FIX BUG: Tuyệt đối KHÔNG gọi API unlock-all ở đây nữa!
-    // Vé của khách vẫn sẽ nằm an toàn trong Database.
     setUser(null);
     localStorage.removeItem('ticketrush_user');
     localStorage.removeItem('ticketrush_session_end');
     navigate('/');
     window.location.reload();
   };
+
+  // Biến kiểm tra xem user hiện tại có phải là admin không
+  const isAdmin = user && user.role === 'admin';
 
   return (
     <div className="min-h-screen bg-[#0B0C10] text-white font-sans selection:bg-brand-secondary selection:text-white flex flex-col relative">
@@ -113,7 +118,7 @@ const CustomerLayout = () => {
         </div>
       )}
 
-            {/* HEADER TỔNG */}
+      {/* HEADER TỔNG */}
       <nav className="flex justify-between items-center p-4 lg:px-20 border-b border-gray-800 bg-[#12141A] sticky top-0 z-40 shadow-lg">
         <div 
           onClick={() => navigate('/')}
@@ -124,28 +129,42 @@ const CustomerLayout = () => {
 
         <div className="flex items-center gap-4 md:gap-8">
           
-          {/* NÚT TRA CỨU VÉ: Hiện Icon 🎟️ trên Mobile, Hiện Chữ trên Desktop */}
-          <button 
-            onClick={() => {
-              if (!user) {
-                alert("Vui lòng đăng nhập để tra cứu vé!");
-                setIntendedRoute(null); 
-                setShowAuth(true);
-              } else {
-                setShowTicketHistory(true);
-              }
-            }}
-            className="text-white/90 hover:text-yellow-300 font-bold transition-colors flex items-center gap-2"
-            title="Tra cứu vé"
-          >
-            <span className="text-2xl md:hidden animate-pulse">🎟️</span>
-            <span className="hidden md:inline uppercase text-sm tracking-widest">Tra cứu vé</span>
-          </button>
+          {/* NÚT TRA CỨU VÉ: Chỉ hiện nếu KHÔNG PHẢI là Admin */}
+          {!isAdmin && (
+            <button 
+              onClick={() => {
+                if (!user) {
+                  alert("Vui lòng đăng nhập để tra cứu vé!");
+                  setIntendedRoute(null); 
+                  setShowAuth(true);
+                } else {
+                  setShowTicketHistory(true);
+                }
+              }}
+              className="text-white/90 hover:text-yellow-300 font-bold transition-colors flex items-center gap-2"
+              title="Tra cứu vé"
+            >
+              <span className="text-2xl md:hidden animate-pulse">🎟️</span>
+              <span className="hidden md:inline uppercase text-sm tracking-widest">Tra cứu vé</span>
+            </button>
+          )}
+
+          {/* NÚT ADMIN SETUP: Chỉ hiện nếu LÀ Admin */}
+          {isAdmin && (
+            <button 
+              onClick={() => navigate('/admin')}
+              className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-black transition shadow-[0_0_15px_rgba(220,38,38,0.4)] uppercase text-xs md:text-sm flex items-center gap-2"
+              title="Vào trang quản trị"
+            >
+              <span>⚙️</span>
+              <span className="hidden md:inline">Admin Setup</span>
+            </button>
+          )}
 
           {user ? (
             <div className="flex items-center gap-3 pl-3 md:pl-6 border-l border-gray-700">
-              <span className="hidden md:block text-white/90 text-sm">Chào, <b className="text-yellow-300">{user.username}</b></span>
-              <button onClick={handleLogout} className="px-3 md:px-4 py-1.5 bg-red-900/50 hover:bg-red-600 border border-red-800/50 rounded-lg transition text-xs md:text-sm font-bold text-red-200 hover:text-white">
+              <span className="hidden md:block text-white/90 text-sm">Chào, <b className={isAdmin ? "text-red-400" : "text-yellow-300"}>{user.username}</b></span>
+              <button onClick={handleLogout} className="px-3 md:px-4 py-1.5 bg-gray-800 hover:bg-red-600 border border-gray-700 rounded-lg transition text-xs md:text-sm font-bold text-gray-300 hover:text-white">
                 Đăng xuất
               </button>
             </div>
@@ -168,7 +187,7 @@ const CustomerLayout = () => {
       </main>
 
       <footer className="py-6 text-center text-gray-600 text-sm border-t border-gray-800 bg-[#0B0C10] mt-auto">
-        &copy; 2026 TicketRush. All rights reserved.
+        &copy; 2026 The Dev House. All rights reserved.
       </footer>
 
       <TicketHistoryModal isOpen={showTicketHistory} onClose={() => setShowTicketHistory(false)} user={user} />

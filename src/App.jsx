@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 // Import Layout và Khách hàng
+import ProtectedRoute from './components/ProtectedRoute';
 import CustomerLayout from "./components/layout/CustomerLayout";
 import EventPage from './pages/EventPage'; 
 import EventDetailPage from './pages/customer/EventDetailPage'; 
@@ -15,15 +16,15 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Nhánh dành cho Khách hàng */}
+        {/* NHÁNH DÀNH CHO KHÁCH HÀNG */}
         <Route path="/" element={<CustomerLayout />}>
           <Route index element={<EventPage />} />
           <Route path="event/:id" element={<EventDetailPage />} />
           <Route path="waiting-room" element={<WaitingRoomPage />} />
         </Route>
 
-        {/* Nhánh độc lập dành cho Admin */}
-        <Route path="/admin">
+        {/* NHÁNH ADMIN ĐÃ BỊ KHÓA */}
+        <Route path="/admin" element={<ProtectedRoute />}>
           <Route index element={<AdminDashboardPage />} />
           <Route path="events" element={<ManageEventsPage />} />
         </Route>
