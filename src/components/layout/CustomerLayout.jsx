@@ -3,6 +3,10 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import TicketHistoryModal from '../common/TicketHistoryModal';
 import axios from 'axios';
 
+// IMPORT 2 COMPONENT MỚI TÁCH
+import Header from './Header';
+import Footer from './Footer';
+
 const CustomerLayout = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
@@ -17,11 +21,11 @@ const CustomerLayout = () => {
   useEffect(() => {
     const savedUser = localStorage.getItem('ticketrush_user');
     if (savedUser) setUser(JSON.parse(savedUser));
-  }, []);
+  }, []); 
 
   // --- LOGIC ĐỒNG HỒ NGẦM 10 PHÚT ---
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.role === 'admin') return;
 
     const interval = setInterval(() => {
       const endTime = localStorage.getItem('ticketrush_session_end');
@@ -65,7 +69,6 @@ const CustomerLayout = () => {
     try {
       const response = await axios.post(`http://localhost:5001${endpoint}`, authForm);
       if (authMode === 'login') {
-        // Lấy thêm trường role từ backend trả về để lưu vào state
         const userData = { 
           userId: response.data.userId, 
           username: response.data.username, 
@@ -75,9 +78,10 @@ const CustomerLayout = () => {
         setUser(userData);
         localStorage.setItem('ticketrush_user', JSON.stringify(userData));
         
-        const newEndTime = Date.now() + 600 * 1000;
-        localStorage.setItem('ticketrush_session_end', newEndTime.toString());
-
+        if (response.data.role !== 'admin') {
+          const newEndTime = Date.now() + 600 * 1000;
+          localStorage.setItem('ticketrush_session_end', newEndTime.toString());
+        }
         setShowAuth(false);
         
         if (intendedRoute) {
@@ -101,8 +105,21 @@ const CustomerLayout = () => {
     window.location.reload();
   };
 
-  // Biến kiểm tra xem user hiện tại có phải là admin không
-  const isAdmin = user && user.role === 'admin';
+  // --- CÁC HÀM XỬ LÝ TRUYỀN XUỐNG HEADER ---
+  const handleLoginClick = () => {
+    setIntendedRoute(null);
+    setShowAuth(true);
+  };
+
+  const handleTicketHistoryClick = () => {
+    if (!user) {
+      alert("Vui lòng đăng nhập để tra cứu vé!");
+      setIntendedRoute(null); 
+      setShowAuth(true);
+    } else {
+      setShowTicketHistory(true);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0B0C10] text-white font-sans selection:bg-brand-secondary selection:text-white flex flex-col relative">
@@ -118,80 +135,24 @@ const CustomerLayout = () => {
         </div>
       )}
 
-      {/* HEADER TỔNG */}
-      <nav className="flex justify-between items-center p-4 lg:px-20 border-b border-gray-800 bg-[#12141A] sticky top-0 z-40 shadow-lg">
-        <div 
-          onClick={() => navigate('/')}
-          className="text-xl md:text-2xl font-black tracking-tighter bg-gradient-to-r from-yellow-400 to-yellow-600 bg-clip-text text-transparent cursor-pointer"
-        >
-          TICKETRUSH
-        </div>
-
-        <div className="flex items-center gap-4 md:gap-8">
-          
-          {/* NÚT TRA CỨU VÉ: Chỉ hiện nếu KHÔNG PHẢI là Admin */}
-          {!isAdmin && (
-            <button 
-              onClick={() => {
-                if (!user) {
-                  alert("Vui lòng đăng nhập để tra cứu vé!");
-                  setIntendedRoute(null); 
-                  setShowAuth(true);
-                } else {
-                  setShowTicketHistory(true);
-                }
-              }}
-              className="text-white/90 hover:text-yellow-300 font-bold transition-colors flex items-center gap-2"
-              title="Tra cứu vé"
-            >
-              <span className="text-2xl md:hidden animate-pulse">🎟️</span>
-              <span className="hidden md:inline uppercase text-sm tracking-widest">Tra cứu vé</span>
-            </button>
-          )}
-
-          {/* NÚT ADMIN SETUP: Chỉ hiện nếu LÀ Admin */}
-          {isAdmin && (
-            <button 
-              onClick={() => navigate('/admin')}
-              className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-black transition shadow-[0_0_15px_rgba(220,38,38,0.4)] uppercase text-xs md:text-sm flex items-center gap-2"
-              title="Vào trang quản trị"
-            >
-              <span>⚙️</span>
-              <span className="hidden md:inline">Admin Setup</span>
-            </button>
-          )}
-
-          {user ? (
-            <div className="flex items-center gap-3 pl-3 md:pl-6 border-l border-gray-700">
-              <span className="hidden md:block text-white/90 text-sm">Chào, <b className={isAdmin ? "text-red-400" : "text-yellow-300"}>{user.username}</b></span>
-              <button onClick={handleLogout} className="px-3 md:px-4 py-1.5 bg-gray-800 hover:bg-red-600 border border-gray-700 rounded-lg transition text-xs md:text-sm font-bold text-gray-300 hover:text-white">
-                Đăng xuất
-              </button>
-            </div>
-          ) : (
-            <button 
-               onClick={() => {
-                 setIntendedRoute(null);
-                 setShowAuth(true);
-               }} 
-               className="bg-yellow-400 hover:bg-yellow-500 text-black px-4 md:px-6 py-2 rounded-lg font-black transition shadow-[0_0_15px_rgba(250,204,21,0.3)] uppercase text-xs md:text-sm"
-            >
-              Đăng nhập
-            </button>
-          )}
-        </div>
-      </nav>
+      {/* COMPONENT HEADER ĐÃ ĐƯỢC TÁCH */}
+      <Header 
+        user={user} 
+        handleLogout={handleLogout} 
+        onLoginClick={handleLoginClick} 
+        onTicketHistoryClick={handleTicketHistoryClick} 
+      />
 
       <main className="flex-1">
         <Outlet context={{ user, setShowAuth, setIntendedRoute }} />
       </main>
 
-      <footer className="py-6 text-center text-gray-600 text-sm border-t border-gray-800 bg-[#0B0C10] mt-auto">
-        &copy; 2026 The Dev House. All rights reserved.
-      </footer>
+      {/* COMPONENT FOOTER ĐÃ ĐƯỢC TÁCH */}
+      <Footer />
 
       <TicketHistoryModal isOpen={showTicketHistory} onClose={() => setShowTicketHistory(false)} user={user} />
 
+      {/* PHẦN MODAL AUTH GIỮ NGUYÊN BÊN LAYOUT CHÍNH ĐỂ DỄ QUẢN LÝ STATE */}
       {showAuth && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-gray-900 p-8 rounded-2xl border border-gray-700 w-full max-w-md relative shadow-2xl animate-fade-in">
