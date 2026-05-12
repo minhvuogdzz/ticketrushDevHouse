@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import SeatMatrix from '../../components/SeatMap/SeatMatrix'; 
 
-// 1. GỌI THẰNG COMPONENT HEADER CHUNG VÀO ĐÂY
+// 1. call API get layout
 import HeroHeader from '../../components/HeroHeader';
 
 const EventDetailPage = () => {
