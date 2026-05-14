@@ -8,7 +8,7 @@ const MatrixSeatBuild = ({
   const unplacedZones = zones.filter(z => !layout.includes(z.section));
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 sticky top-6">
       {/* GRID MAP */}
       <div className="bg-[#12141A] rounded-2xl border border-gray-800 p-6 shadow-xl">
         <div className="flex justify-between items-start mb-6 border-b border-gray-800 pb-4">

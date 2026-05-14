@@ -17,4 +17,7 @@ router.post('/admin/cancel', seatController.adminCancelTicket);
 router.post('/admin/update-prices', seatController.updatePrices);
 router.post('/admin/generate-map', seatController.generateMap);
 
+router.get('/admin/dashboard', seatController.getDashboardData);
+router.post('/admin/refund-zone', seatController.refundZone);
+router.post('/admin/refund-all', seatController.refundAll);
 module.exports = router;

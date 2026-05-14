@@ -1,4 +1,5 @@
 const Seat = require('../models/Seat');
+const Event = require('../models/Event');
 
 exports.lockSeat = async (req, res) => {
   try {
@@ -277,5 +278,70 @@ exports.generateMap = async (req, res) => {
   } catch (error) {
     console.error("Lỗi generate map:", error);
     res.status(500).json({ success: false, message: 'Lỗi server khi tạo sơ đồ.' });
+  }
+};
+
+// 1. LẤY DATA CHO DASHBOARD (Tất cả vé đã bán + Thông tin event)
+exports.getDashboardData = async (req, res) => {
+  try {
+    const event = await Event.findOne().sort({ _id: -1 });
+    const zones = event ? event.zones : [];
+
+    // Chỉ lấy những ghế đã bán (status: 'sold' hoặc tùy logic dự án của sếp)
+    const soldSeats = await Seat.find({ status: 'sold' }); 
+
+    let totalRevenue = 0;
+    const tickets = soldSeats.map(seat => {
+      totalRevenue += seat.price || 0;
+      return {
+        seatId: seat.seatId,
+        zone: seat.zone,
+        zoneName: zones.find(z => z.section === seat.zone)?.name || seat.zone,
+        price: seat.price,
+        username: seat.userInfo?.username || 'Khách',
+        fullName: seat.userInfo?.fullName || '',
+        phone: seat.userInfo?.phone || ''
+      };
+    });
+
+    res.json({
+      zones: zones,
+      tickets: tickets,
+      stats: {
+        totalSold: tickets.length,
+        revenue: totalRevenue
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi lấy dữ liệu dashboard" });
+  }
+};
+
+// 2. HỦY VÀ HOÀN TIỀN THEO KHU VỰC
+exports.refundZone = async (req, res) => {
+  try {
+    const { zone } = req.body;
+    // Reset toàn bộ ghế của Zone đó về trạng thái 'available' và xóa data người dùng
+    await Seat.updateMany(
+      { zone: zone, status: { $in: ['booked', 'sold'] } },
+      { $set: { status: 'available', lockedBy: null, lockUntil: null }, $unset: { userInfo: 1 } }
+    );
+    res.json({ message: `Đã hoàn tiền khu vực ${zone}` });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi hoàn tiền khu vực" });
+  }
+};
+
+// 3. HỦY VÀ HOÀN TIỀN TOÀN BỘ SỰ KIỆN
+exports.refundAll = async (req, res) => {
+  try {
+    // Reset toàn bộ ghế có người mua/giữ chỗ
+    await Seat.updateMany(
+      { status: { $in: ['booked', 'sold'] } },
+      { $set: { status: 'available', lockedBy: null, lockUntil: null }, $unset: { userInfo: 1 } }
+    );
+    res.json({ message: "Đã hoàn tiền toàn bộ sự kiện" });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi hoàn tiền toàn bộ" });
   }
 };

@@ -128,8 +128,58 @@ const ManageEventsPage = () => {
   };
   const handleRemoveFromGrid = (idx) => { const newLayout = [...layout]; newLayout[idx] = null; setLayout(newLayout); };
 
-  const handleUpdatePrices = async () => { /* Logic gọi API giống file cũ */ };
-  const handleGenerateMap = async () => { /* Logic gọi API giống file cũ */ };
+  const handleUpdatePrices = async () => {
+    if (!window.confirm("Cập nhật giá mới cho các vé chưa bán?")) return;
+    setIsProcessing(true);
+    try {
+      await axios.post('http://localhost:5001/api/event/update', { 
+        ...eventInfo, banners, lineupBanners, athleteBanners, zones, layout, gridRows: gridConfig.rows, gridCols: gridConfig.cols 
+      });
+      await axios.post('http://localhost:5001/api/seats/admin/update-prices', { zones });
+      alert("✅ Đã cập nhật giá vé mới!");
+    } catch (err) { 
+      alert("❌ Lỗi cập nhật giá!"); 
+      console.error(err);
+    }
+    finally { setIsProcessing(false); }
+  };
+
+  const handleGenerateMap = async () => {
+    setIsProcessing(true);
+    try {
+      // 1. CHECK BOT CHỐNG GIAN LẬN: Gọi API kiểm tra thẳng vào Database
+      const seatsRes = await axios.get('http://localhost:5001/api/seats');
+      const activeSeats = seatsRes.data.filter(seat => seat.status === 'sold' || seat.status === 'booked');
+
+      // NẾU PHÁT HIỆN CÒN VÉ NỢ -> ĐÁ VĂNG
+      if (activeSeats.length > 0) {
+        alert(`🚨 HỆ THỐNG TỪ CHỐI: Phát hiện còn ${activeSeats.length} vé đã bán hoặc đang giữ chỗ mà CHƯA ĐƯỢC HOÀN TIỀN!\n\nBạn sẽ bị chuyển hướng về trang Tổng quan để xử lý ngay lập tức.`);
+        setIsProcessing(false);
+        navigate('/admin'); // Đá thẳng cổ về trang Dashboard
+        return;
+      }
+
+      // 2. NẾU SẠCH SẼ KHÔNG CÒN VÉ NÀO -> MỚI CHO PHÉP NHẬP MÃ TẠO
+      setIsProcessing(false); // Tắt loading để hiện Prompt
+      if (window.prompt("✅ Hệ thống an toàn (Không còn vé nợ).\n\nNhập 'XACNHAN' để CHÍNH THỨC XÓA SƠ ĐỒ CŨ VÀ TẠO MỚI:") !== "XACNHAN") {
+        return;
+      }
+
+      // 3. TIẾN HÀNH LƯU CẤU HÌNH VÀ SINH SƠ ĐỒ GHẾ
+      setIsProcessing(true);
+      await axios.post('http://localhost:5001/api/event/update', { 
+        ...eventInfo, banners, lineupBanners, athleteBanners, zones, layout, gridRows: gridConfig.rows, gridCols: gridConfig.cols 
+      });
+      await axios.post('http://localhost:5001/api/seats/admin/generate-map', { zones });
+      alert("🎉 Đã khởi tạo sơ đồ mới thành công!");
+
+    } catch (err) { 
+      alert("❌ Lỗi hệ thống khi kiểm tra hoặc tạo sơ đồ!"); 
+      console.error(err);
+    } finally { 
+      setIsProcessing(false); 
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0B0C10] text-gray-200 font-sans flex flex-col md:flex-row pb-20 md:pb-0">
