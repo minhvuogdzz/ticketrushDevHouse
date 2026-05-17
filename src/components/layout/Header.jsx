@@ -1,11 +1,26 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios'; // Bổ sung import axios
 
 const Header = ({ user, handleLogout, onLoginClick, onTicketHistoryClick }) => {
   const navigate = useNavigate();
   
   // Biến kiểm tra xem user hiện tại có phải là admin không
   const isAdmin = user && user.role === 'admin';
+
+  // HÀM ĐÁNH CHẶN: Rời hàng chờ trước khi đăng xuất thật
+  const handleLogoutClick = async () => {
+    if (user && user.userId) {
+      try {
+        // Báo cho Server xé vé hàng chờ
+        await axios.post('http://localhost:5001/api/queue/leave', { userId: user.userId });
+      } catch (err) {
+        console.log("Lỗi nhả slot khi đăng xuất", err);
+      }
+    }
+    // Gọi hàm đăng xuất gốc để xóa local storage và chuyển trang
+    handleLogout(); 
+  };
 
   return (
     <nav className="flex justify-between items-center p-4 lg:px-20 border-b border-gray-800 bg-[#12141A] sticky top-0 z-40 shadow-lg">
@@ -45,7 +60,8 @@ const Header = ({ user, handleLogout, onLoginClick, onTicketHistoryClick }) => {
         {user ? (
           <div className="flex items-center gap-3 pl-3 md:pl-6 border-l border-gray-700">
             <span className="hidden md:block text-white/90 text-sm">Chào, <b className={isAdmin ? "text-red-400" : "text-yellow-300"}>{user.username}</b></span>
-            <button onClick={handleLogout} className="px-3 md:px-4 py-1.5 bg-gray-800 hover:bg-red-600 border border-gray-700 rounded-lg transition text-xs md:text-sm font-bold text-gray-300 hover:text-white">
+            {/* ĐÃ FIX: Gọi hàm đánh chặn thay vì gọi thẳng prop */}
+            <button onClick={handleLogoutClick} className="px-3 md:px-4 py-1.5 bg-gray-800 hover:bg-red-600 border border-gray-700 rounded-lg transition text-xs md:text-sm font-bold text-gray-300 hover:text-white">
               Đăng xuất
             </button>
           </div>

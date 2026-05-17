@@ -22,25 +22,85 @@ const Flyer = ({ flyer }) => {
 
 const SeatMatrix = () => {
   const navigate = useNavigate();
-  // Lấy thông tin user và hàm gọi popup login từ Layout cha
   const { user, setShowAuth } = useOutletContext() || {};
+
+  // ================= STATE HÀNG CHỜ ẢO =================
+  const [queueInfo, setQueueInfo] = useState({ isChecking: true, allowed: false, position: 0 });
 
   const [seats, setSeats] = useState([]);
   const [myLockedSeats, setMyLockedSeats] = useState([]);
   const [filterSection, setFilterSection] = useState('ALL');
 
-  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
 
-  // State quản lý thông tin khách hàng lúc xuất vé
   const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '' });
   const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
 
   const [flyingSeats, setFlyingSeats] = useState([]);
   const cartIconRef = useRef(null);
-  const cartBoxRef = useRef(null);
 
-  // --- FETCH DỮ LIỆU EVENT TỪ DB ĐỂ LẤY SƠ ĐỒ ĐỘNG ---
+  // ================= LOGIC HÀNG CHỜ ẢO (VIRTUAL QUEUE) =================
+  useEffect(() => {
+    if (!user) {
+      setQueueInfo({ isChecking: false, allowed: true, position: 0 });
+      return;
+    }
+
+    let intervalId;
+
+    const joinVirtualQueue = async () => {
+      try {
+        const res = await axios.post('http://localhost:5001/api/queue/join', { userId: user.userId });
+        if (res.data.allowed) {
+          setQueueInfo({ isChecking: false, allowed: true, position: 0 });
+        } else {
+          setQueueInfo({ isChecking: false, allowed: false, position: res.data.position });
+          startPolling();
+        }
+      } catch (error) {
+        console.error("Lỗi kết nối hàng chờ", error);
+        // ĐÃ FIX: Lỗi server (500, quá tải) thì nhốt vào phòng chờ ảo chứ không thả cửa
+        setQueueInfo({ isChecking: false, allowed: false, position: 999 });
+        startPolling(); 
+      }
+    };
+
+    const startPolling = () => {
+      intervalId = setInterval(async () => {
+        try {
+          const res = await axios.get(`http://localhost:5001/api/queue/status/${user.userId}`);
+          if (res.data.allowed) {
+            setQueueInfo({ isChecking: false, allowed: true, position: 0 });
+            clearInterval(intervalId);
+          } else {
+            setQueueInfo(prev => ({ ...prev, position: res.data.position }));
+          }
+        } catch (error) {
+          console.error("Lỗi check queue status", error);
+        }
+      }, 5000); 
+    };
+
+    joinVirtualQueue();
+
+    // HÀM DỌN DẸP KHI THOÁT COMPONENT / TẮT TAB
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      
+      // ĐÃ FIX: Dùng fetch với keepalive để đảm bảo API bắn tới đích dù trình duyệt bị đóng ngang
+      if (user && user.userId) {
+        fetch('http://localhost:5001/api/queue/leave', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.userId }),
+          keepalive: true
+        }).catch(err => console.log("Lỗi nhả slot", err));
+      }
+    };
+  }, [user]);
+
+  // --- FETCH DỮ LIỆU EVENT ---
   const [eventData, setEventData] = useState(null);
   useEffect(() => {
     axios.get('http://localhost:5001/api/event')
@@ -50,8 +110,10 @@ const SeatMatrix = () => {
 
   const eventZones = eventData?.zones || [];
 
-  // --- FETCH GHẾ & TỰ ĐỘNG PHỤC HỒI GIỎ HÀNG ---
+  // --- FETCH GHẾ & WEBSOCKET ---
   useEffect(() => {
+    if (!queueInfo.allowed) return;
+
     const fetchSeats = async () => {
       try {
         const response = await axios.get('http://localhost:5001/api/seats');
@@ -61,9 +123,7 @@ const SeatMatrix = () => {
         if (user) {
           const myLocked = allSeats.filter(s => {
             if (!s.lockedBy || !user || !user.userId) return false;
-            // Trích xuất ID an toàn
             const ownerId = s.lockedBy._id || s.lockedBy;
-            // Ép kiểu String để chống lỗi
             return String(ownerId) === String(user.userId) && s.status === 'locked';
           });
           setMyLockedSeats(myLocked.map(s => s.seatId));
@@ -77,19 +137,17 @@ const SeatMatrix = () => {
     const socket = io('http://localhost:5001');
     socket.on('seatUpdated', (updatedSeat) => {
       if (updatedSeat.type === 'RELOAD') {
-        // Nếu admin đổi giá hoặc reset sơ đồ, bắt buộc tải lại ghế
         fetchSeats();
         return;
       }
       setSeats(prevSeats => prevSeats.map(seat => seat.seatId === updatedSeat.seatId ? updatedSeat : seat));
 
-      // Nếu Backend tự động nhả vé (do user hết hạn hoặc bị kick), xóa khỏi giỏ hàng
       if (updatedSeat.status === 'available') {
         setMyLockedSeats(prev => prev.filter(id => id !== updatedSeat.seatId));
       }
     });
     return () => socket.disconnect();
-  }, [user]);
+  }, [user, queueInfo.allowed]);
 
   const filteredSeats = useMemo(() => {
     if (filterSection === 'ALL') return [];
@@ -113,12 +171,9 @@ const SeatMatrix = () => {
     try {
       const response = await axios.post('http://localhost:5001/api/seats/lock', { seatId: seat.seatId, userId: user.userId });
       if (response.data.success) {
-        const isMobile = window.innerWidth < 1024;
-        const targetRef = isMobile ? cartIconRef : cartBoxRef;
-
-        if (targetRef.current && event) {
+        if (cartIconRef.current && event) {
           const btnRect = event.target.getBoundingClientRect();
-          const targetRect = targetRef.current.getBoundingClientRect();
+          const targetRect = cartIconRef.current.getBoundingClientRect();
           const flyer = {
             id: Date.now(), text: seat.number,
             startX: btnRect.left, startY: btnRect.top,
@@ -151,18 +206,19 @@ const SeatMatrix = () => {
   };
 
   // --- LOGIC THANH TOÁN ---
-  const handleCheckoutClick = () => setShowQRModal(true);
+  const handleCheckoutClick = () => {
+    setIsCartOpen(false); 
+    setShowQRModal(true);
+  };
 
   const confirmPaymentSuccess = async () => {
     if (!customerInfo.name.trim() || !customerInfo.phone.trim()) {
       alert("⚠️ BẮT BUỘC: Vui lòng nhập Họ Tên và Số điện thoại để hệ thống xuất vé!");
       return;
     }
-
     setIsVerifyingPayment(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 3000));
-
       const response = await axios.post('http://localhost:5001/api/seats/checkout', {
         seatIds: myLockedSeats,
         userId: user.userId,
@@ -171,13 +227,19 @@ const SeatMatrix = () => {
       });
 
       if (response.data.success) {
+        // GỌI API TRẢ SLOT KHI ĐÃ MUA THÀNH CÔNG ĐỂ NHƯỜNG CHỖ CHO NGƯỜI KHÁC
+        axios.post('http://localhost:5001/api/queue/leave', { userId: user.userId }).catch(() => {});
+
         alert('🎉 Xác nhận từ ngân hàng: Đã nhận được tiền. Vé của bạn đã được xuất thành công!');
         setMyLockedSeats([]);
         setFilterSection('ALL');
-        setIsMobileCartOpen(false);
+        setIsCartOpen(false);
         setShowQRModal(false);
-        localStorage.removeItem('ticketrush_session_end'); // Xóa session đếm ngược
+        localStorage.removeItem('ticketrush_session_end'); 
         setCustomerInfo({ name: '', phone: '' });
+        
+        // Cố tình kick user ra ngoài sau khi thanh toán xong
+        window.location.reload(); 
       }
     } catch (error) {
       alert(`❌ Ngân hàng báo lỗi: ${error.response?.data?.message || 'Chưa nhận được giao dịch. Vui lòng thử lại!'}`);
@@ -186,7 +248,7 @@ const SeatMatrix = () => {
     }
   };
 
-  // --- GIAO DIỆN KHÁN ĐÀI ĐỘNG (ADMIN CẤU HÌNH) ---
+  // --- GIAO DIỆN KHÁN ĐÀI ĐỘNG ---
   const ZONE_COLORS = [
     { bg: 'bg-yellow-900/30', text: 'text-yellow-500', border: 'border-yellow-500' },
     { bg: 'bg-blue-900/30', text: 'text-blue-400', border: 'border-blue-500' },
@@ -228,12 +290,10 @@ const SeatMatrix = () => {
             {activeZoneName}
           </h3>
           <div className="flex flex-col gap-6 items-center w-full">
-            {/* ĐÃ FIX: Sắp xếp Hàng (Row) theo thứ tự số học (1, 2, 3...) */}
             {Object.keys(rows).sort((a, b) => Number(a) - Number(b)).map(rowNum => (
               <div key={rowNum} className="flex flex-wrap justify-center gap-2 md:gap-3 items-center w-full">
                 <span className="w-6 md:w-8 text-xs md:text-sm text-yellow-500 font-bold text-right pr-2">R{rowNum}</span>
 
-                {/* ĐÃ FIX: Sắp xếp Cột (Ghế) theo thứ tự số học (1, 2, 3... thay vì 1, 10, 11) */}
                 {rows[rowNum].sort((a, b) => a.number - b.number).map(seat => (
                   <button
                     key={seat.seatId}
@@ -257,7 +317,6 @@ const SeatMatrix = () => {
     );
   };
 
-  // --- COMPONENT GIỎ HÀNG (Khai báo đúng vị trí trước khi dùng) ---
   const CartContent = () => (
     <>
       <h3 className="text-xl md:text-2xl font-black mb-6 text-white flex justify-between items-center border-b border-gray-700 pb-4">
@@ -270,10 +329,9 @@ const SeatMatrix = () => {
           <p className="text-gray-300 font-medium">Bạn chưa chọn ghế nào.</p>
         </div>
       ) : (
-        <>
-          <div className="flex flex-col gap-3 max-h-[50vh] md:max-h-[400px] overflow-y-auto pr-2 custom-scrollbar mb-6">
+        <div className="flex flex-col h-full">
+          <div className="flex-1 flex flex-col gap-3 overflow-y-auto pr-2 custom-scrollbar mb-6">
             {myCartDetails.map(seat => {
-              // Tìm tên zone động để hiển thị
               const zoneName = eventZones.find(z => z.section === seat.section)?.name || seat.section;
               return (
                 <div key={seat.seatId} className="bg-gray-800/80 border-l-4 border-yellow-500 p-3 md:p-4 rounded-r-xl flex justify-between items-center group shadow-md">
@@ -296,17 +354,50 @@ const SeatMatrix = () => {
           <button onClick={handleCheckoutClick} className="w-full bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 text-black py-4 rounded-xl font-black text-lg transition shadow-[0_0_20px_rgba(250,204,21,0.4)] uppercase">
             Thanh toán QR Code
           </button>
-        </>
+        </div>
       )}
     </>
   );
 
-  // ================= MAIN RENDER =================
+  // ================= RENDER CÁC TRẠNG THÁI HÀNG CHỜ =================
+  if (queueInfo.isChecking) {
+    return (
+      <div className="w-full h-[60vh] flex flex-col items-center justify-center bg-[#0a0a0a] text-yellow-500">
+        <div className="animate-spin text-5xl mb-4">⏳</div>
+        <h2 className="text-xl font-bold text-white uppercase tracking-widest">Đang kết nối hệ thống...</h2>
+      </div>
+    );
+  }
+
+  if (!queueInfo.allowed) {
+    return (
+      <div className="w-full min-h-[70vh] flex flex-col items-center justify-center bg-[#0a0a0a] px-4">
+        <div className="bg-[#12141A] p-8 md:p-12 rounded-3xl border border-gray-800 shadow-2xl max-w-lg w-full text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-600 via-yellow-500 to-green-500 animate-pulse"></div>
+          <div className="text-6xl mb-6">🚧</div>
+          <h2 className="text-2xl md:text-3xl font-black text-white uppercase mb-2">Hệ thống đang quá tải</h2>
+          <p className="text-gray-400 mb-8 text-sm leading-relaxed">
+            Hàng ngàn người đang cùng truy cập. Để đảm bảo trải nghiệm mua vé tốt nhất, bạn đã được đưa vào hàng chờ ảo.
+          </p>
+          <div className="bg-black/50 p-6 rounded-2xl border border-gray-800 mb-6 shadow-inner">
+            <p className="text-xs text-gray-500 uppercase font-bold mb-2">Vị trí của bạn hiện tại</p>
+            <p className="text-5xl font-black text-yellow-500 drop-shadow-[0_0_15px_rgba(234,179,8,0.5)]">
+              #{queueInfo.position}
+            </p>
+          </div>
+          <p className="text-red-500 text-xs font-bold uppercase animate-pulse">
+            ⚠️ Vui lòng giữ nguyên trang này, hệ thống sẽ tự động chuyển hướng khi đến lượt!
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ================= MAIN RENDER SƠ ĐỒ GHẾ =================
   return (
     <div className="relative w-full">
       {flyingSeats.map(flyer => <Flyer key={flyer.id} flyer={flyer} />)}
 
-      {/* --- MODAL QR VÀ NHẬP THÔNG TIN --- */}
       {showQRModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
           <div className="bg-white rounded-3xl p-6 md:p-8 max-w-sm w-full flex flex-col items-center animate-fade-in text-gray-900 shadow-2xl relative">
@@ -337,82 +428,62 @@ const SeatMatrix = () => {
         </div>
       )}
 
-      {/* ICON GIỎ HÀNG NỔI MOBILE */}
-      <div className="lg:hidden fixed top-24 right-4 z-[60]">
-        <button ref={cartIconRef} onClick={() => setIsMobileCartOpen(true)} className="bg-gradient-to-tr from-yellow-600 to-yellow-400 text-black p-4 rounded-full shadow-[0_5px_25px_rgba(250,204,21,0.5)] flex items-center justify-center relative active:scale-95 transition-transform">
-          <span className="text-2xl">🛒</span>
-          {myLockedSeats.length > 0 && <span className="absolute -top-2 -left-2 bg-red-600 text-white text-xs font-black w-6 h-6 flex items-center justify-center rounded-full animate-bounce shadow-md border-2 border-gray-900">{myLockedSeats.length}</span>}
+      <div className="fixed top-20 right-6 md:right-10 z-[60]">
+        <button ref={cartIconRef} onClick={() => setIsCartOpen(true)} className="bg-gradient-to-tr from-yellow-600 to-yellow-400 text-black p-4 rounded-full shadow-[0_5px_25px_rgba(250,204,21,0.5)] flex items-center justify-center relative active:scale-95 hover:scale-110 transition-transform">
+          <span className="text-2xl md:text-3xl">🛒</span>
+          {myLockedSeats.length > 0 && <span className="absolute -top-2 -left-2 md:-top-3 md:-left-3 bg-red-600 text-white text-xs md:text-sm font-black w-6 h-6 md:w-8 md:h-8 flex items-center justify-center rounded-full animate-bounce shadow-md border-2 border-gray-900">{myLockedSeats.length}</span>}
         </button>
       </div>
 
-      {/* MOBILE DRAWER */}
-      {isMobileCartOpen && (
-        <div className="lg:hidden fixed inset-0 z-[100] flex justify-end">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsMobileCartOpen(false)}></div>
-          <div className="relative w-full max-w-sm bg-gray-900 h-full p-6 shadow-2xl border-l border-gray-700 flex flex-col animate-slide-in-right">
-            <button onClick={() => setIsMobileCartOpen(false)} className="absolute top-4 right-6 text-gray-400 hover:text-white text-2xl">✕</button>
-            <div className="mt-8 flex-1"><CartContent /></div>
+      {isCartOpen && (
+        <div className="fixed inset-0 z-[100] flex justify-end">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsCartOpen(false)}></div>
+          <div className="relative w-full max-w-md bg-[#12141A] h-full p-6 shadow-2xl border-l border-gray-700 flex flex-col animate-slide-in-right">
+            <button onClick={() => setIsCartOpen(false)} className="absolute top-4 right-6 text-gray-400 hover:text-white bg-gray-800 hover:bg-red-600 w-8 h-8 rounded-full flex items-center justify-center transition">✕</button>
+            <div className="mt-8 flex-1 h-full overflow-hidden flex flex-col"><CartContent /></div>
           </div>
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 items-start w-full">
-        {/* CỘT TRÁI: SƠ ĐỒ VÉ */}
-        <div className="flex-1 w-full bg-gray-900/90 p-4 md:p-8 rounded-2xl shadow-2xl border border-gray-700 backdrop-blur-xl">
-
-          {/* HEADER: TRA CỨU ĐỘNG THEO ZONES */}
-          <div className="mb-8 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 border-b border-gray-700 pb-6 w-full">
+      <div className="w-full">
+        <div className="w-full bg-[#12141A] p-4 md:p-8 rounded-2xl shadow-xl border border-gray-800">
+          <div className="mb-8 flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 border-b border-gray-800 pb-6 w-full">
             <div className="w-full xl:w-auto overflow-x-auto custom-scrollbar pb-2 xl:pb-0">
-              <h3 className="text-lg md:text-xl font-bold text-white mb-3">Tra cứu nhanh khu vực</h3>
+              <h3 className="text-lg md:text-xl font-bold text-white mb-3 uppercase tracking-wide">Tra cứu nhanh khu vực</h3>
               <div className="flex gap-2 w-max xl:w-full">
-                <button onClick={() => setFilterSection('ALL')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterSection === 'ALL' ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'}`}>Sơ đồ tổng</button>
+                <button onClick={() => setFilterSection('ALL')} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${filterSection === 'ALL' ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700'}`}>Sơ đồ tổng</button>
                 {eventZones.map(sec => (
-                  <button key={sec.section} onClick={() => setFilterSection(sec.section)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterSection === sec.section ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-600'}`}>{sec.name}</button>
+                  <button key={sec.section} onClick={() => setFilterSection(sec.section)} className={`px-5 py-2.5 rounded-lg text-sm font-bold transition-all ${filterSection === sec.section ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white border border-gray-700'}`}>{sec.name}</button>
                 ))}
               </div>
             </div>
 
-            <div className="flex gap-4 items-center text-xs md:text-sm text-gray-300 bg-black/40 p-3 rounded-lg border border-gray-800 w-full xl:w-auto justify-center">
-              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-gray-300"></div> Trống</div>
-              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-yellow-400"></div> Đang chọn</div>
-              <div className="flex items-center gap-2"><div className="w-4 h-4 rounded bg-red-600 opacity-60"></div> Đã bán</div>
+            <div className="flex gap-4 items-center text-xs md:text-sm text-gray-300 bg-black/40 px-4 py-3 rounded-xl border border-gray-800 w-full xl:w-auto justify-center shadow-inner">
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-gray-600"></div> Trống</div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse"></div> Đang chọn</div>
+              <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-600 opacity-60"></div> Đã bán</div>
             </div>
           </div>
 
           {filterSection === 'ALL' ? (
-            <div className="w-full flex flex-col items-center animate-fade-in">
-              <div className="w-full max-w-xl mx-auto h-8 md:h-16 bg-gradient-to-b from-yellow-600 to-yellow-900 rounded-t-full mb-6 md:mb-10 flex items-center justify-center border-b-2 md:border-b-4 border-yellow-400 shadow-[0_10px_50px_rgba(250,204,21,0.2)]">
-                <span className="text-yellow-100 font-black tracking-[0.15em] md:tracking-[0.3em] text-[10px] md:text-xl drop-shadow-md">SÂN KHẤU CHÍNH</span>
+            <div className="w-full flex flex-col items-center animate-fade-in-up">
+              <div className="w-full max-w-3xl mx-auto h-12 md:h-16 bg-gradient-to-b from-yellow-600 to-yellow-900 rounded-t-full mb-8 md:mb-12 flex items-center justify-center border-b-4 border-yellow-400 shadow-[0_10px_50px_rgba(250,204,21,0.2)] relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-yellow-300/40 via-transparent to-transparent"></div>
+                <span className="relative z-10 text-yellow-100 font-black tracking-[0.2em] md:tracking-[0.4em] text-xs md:text-xl drop-shadow-lg uppercase">Sân khấu chính</span>
               </div>
 
-              {/* SƠ ĐỒ ĐỘNG: Tự động chia cột theo Admin Setup (vd 4x5, 2x6) */}
               <div
-                className="w-full max-w-4xl mx-auto grid gap-2 md:gap-4 md:px-10 transition-all duration-500"
+                className="w-full max-w-5xl mx-auto grid gap-3 md:gap-6 md:px-10 transition-all duration-500"
                 style={{ gridTemplateColumns: `repeat(${eventData?.gridCols || 3}, minmax(0, 1fr))` }}
               >
                 {eventData?.layout?.map((cellSectionId, index) => {
                   const zone = eventZones.find(z => z.section === cellSectionId);
-
-                  // Nếu ô lưới Admin để trống
-                  if (!zone) {
-                    return <div key={`empty-${index}`} className="w-full min-h-[100px] md:min-h-[140px] rounded-2xl border border-dashed border-gray-800/30"></div>;
-                  }
-
-                  // Vẽ Block Khán đài
-                  return (
-                    <div key={`zone-${zone.section}`}>
-                      {renderZoneBlock(zone.section, zone.name, zone.price, index)}
-                    </div>
-                  );
+                  if (!zone) return <div key={`empty-${index}`} className="w-full min-h-[120px] md:min-h-[160px] rounded-2xl border-2 border-dashed border-gray-800/40 bg-black/10"></div>;
+                  return <div key={`zone-${zone.section}`}>{renderZoneBlock(zone.section, zone.name, zone.price, index)}</div>;
                 })}
               </div>
             </div>
           ) : renderDetailedSeats()}
-        </div>
-
-        {/* CỘT PHẢI: GIỎ HÀNG */}
-        <div ref={cartBoxRef} className="hidden lg:block w-[350px] xl:w-[400px] bg-gray-900/90 p-6 rounded-2xl border border-gray-700 shadow-2xl backdrop-blur-xl sticky top-24">
-          <CartContent />
         </div>
       </div>
     </div>
