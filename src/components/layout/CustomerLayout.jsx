@@ -46,11 +46,17 @@ const CustomerLayout = () => {
     return () => clearInterval(interval);
   }, [user]);
 
+  // ĐÃ FIX: Bổ sung logic xé vé Hàng chờ ảo khi bị ép đăng xuất
   const handleForceLogout = async () => {
-    try {
-      await axios.post('http://localhost:5001/api/seats/unlock-all', { userId: user.userId });
-    } catch (error) {
-      console.error("Lỗi khi giải phóng vé:", error);
+    if (user && user.userId) {
+      try {
+        // 1. Nhả toàn bộ ghế đang giữ
+        await axios.post('http://localhost:5001/api/seats/unlock-all', { userId: user.userId });
+        // 2. Nhả luôn Slot hàng chờ (Tránh hiệu ứng Bóng ma giữ chỗ)
+        await axios.post('http://localhost:5001/api/queue/leave', { userId: user.userId });
+      } catch (error) {
+        console.error("Lỗi khi giải phóng vé và hàng chờ:", error);
+      }
     }
 
     setShowSessionWarning(false);
@@ -79,7 +85,8 @@ const CustomerLayout = () => {
         localStorage.setItem('ticketrush_user', JSON.stringify(userData));
         
         if (response.data.role !== 'admin') {
-          const newEndTime = Date.now() + 600 * 1000;
+          // Lưu mốc 10 phút đếm ngược
+          const newEndTime = Date.now() + 15 * 1000;
           localStorage.setItem('ticketrush_session_end', newEndTime.toString());
         }
         setShowAuth(false);

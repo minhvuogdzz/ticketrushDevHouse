@@ -1,15 +1,15 @@
-const User = require('../models/User'); // Đảm bảo ông có model User nhé
+const User = require('../models/User'); 
 
 exports.login = async (req, res) => {
   const { username, password } = req.body;
 
-  // 1. KIỂM TRA ĐẶC QUYỀN ADMIN (Chặn ngay từ vòng gửi xe)
+  // 1. KIỂM TRA ĐẶC QUYỀN ADMIN 
   if (username === 'admin' && password === 'admin88') {
     return res.status(200).json({
       message: "Đăng nhập Admin thành công!",
       userId: "admin_999",
       username: "admin",
-      role: "admin", // <-- Cái này để Frontend nhận diện
+      role: "admin", 
       token: "admin_token_secret"
     });
   }
@@ -23,7 +23,7 @@ exports.login = async (req, res) => {
       return res.status(404).json({ message: "Không tìm thấy tài khoản trong hệ thống!" });
     }
 
-    // Nếu sai mật khẩu (Đang ví dụ check text thường, nếu ông dùng bcrypt thì sửa lại)
+    // Nếu sai mật khẩu 
     if (user.password !== password) {
       return res.status(400).json({ message: "Sai mật khẩu!" });
     }
@@ -53,11 +53,11 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Tài khoản này đã tồn tại!" });
     }
 
-    // 2. Nếu chưa có thì tạo mới (Đang lưu plain text theo code cũ của ông)
+    // 2. Nếu chưa có thì tạo mới 
     const newUser = new User({
       username,
       password,
-      role: 'user' // Mặc định tạo ra là user thường
+      role: 'user' 
     });
 
     // 3. Lưu vào DB
