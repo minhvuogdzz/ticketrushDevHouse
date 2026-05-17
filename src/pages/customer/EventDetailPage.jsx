@@ -50,7 +50,6 @@ const EventDetailPage = () => {
           {/* Banner thông báo đếm ngược */}
           <div className="bg-blue-900/20 border border-blue-500/30 rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
              <div className="flex items-center gap-4 text-center md:text-left">
-                <div className="text-3xl drop-shadow-md">🛡️</div>
                 <div>
                    <h4 className="text-white font-black uppercase text-sm tracking-wide">Hệ thống giữ chỗ thông minh</h4>
                    <p className="text-gray-400 text-xs mt-1">Sau khi chọn ghế, bạn có 10 phút để hoàn tất thanh toán trước khi ghế được nhả ra cho người khác.</p>

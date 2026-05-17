@@ -86,7 +86,7 @@ const CustomerLayout = () => {
         
         if (response.data.role !== 'admin') {
           // Lưu mốc 10 phút đếm ngược
-          const newEndTime = Date.now() + 15 * 1000;
+          const newEndTime = Date.now() + 600 * 1000;
           localStorage.setItem('ticketrush_session_end', newEndTime.toString());
         }
         setShowAuth(false);
