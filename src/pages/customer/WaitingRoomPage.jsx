@@ -20,8 +20,7 @@ const WaitingRoomPage = () => {
       try {
         const response = await axios.get(`http://localhost:5001/api/queue/status/${user.userId}`);
         if (response.data.allowed) {
-          // Đến lượt rồi, quay lại trang chọn ghế
-          navigate('/event/1'); // Đổi '1' thành ID sự kiện động nếu có
+          navigate('/event/1'); 
         } else {
           setPosition(response.data.position);
         }

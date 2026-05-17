@@ -7,7 +7,7 @@ const Seat = ({ id, status, onSelect }) => {
       case 'Available': return 'bg-gray-300 hover:bg-green-400 cursor-pointer'; // Ghế trống
       case 'Locked': return 'bg-yellow-400 cursor-not-allowed'; // Đang bị người khác giữ
       case 'Sold': return 'bg-red-500 cursor-not-allowed'; // Đã bán
-      case 'Selected': return 'bg-green-500'; // Ghế bạn đang chọn
+      case 'Selected': return 'bg-green-500'; // Ghế đang chọn
       default: return 'bg-gray-300';
     }
   };

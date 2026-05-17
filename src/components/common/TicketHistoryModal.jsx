@@ -51,7 +51,7 @@ const TicketHistoryModal = ({ isOpen, onClose, user }) => {
       try {
         const response = await axios.get('http://localhost:5001/api/seats');
         
-        // ĐÃ FIX: ÉP KIỂU STRING ĐỂ SO SÁNH CHÍNH XÁC 100%
+        // ÉP KIỂU STRING ĐỂ SO SÁNH CHÍNH XÁC 100%
         const userTickets = response.data.filter(seat => {
           if (!seat.lockedBy || !user || !user.userId) return false;
           

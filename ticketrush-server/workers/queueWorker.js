@@ -20,7 +20,7 @@ const startQueueWorker = () => {
           const topWaitingUsers = await Queue.find({ status: 'waiting' }).sort({ joinedAt: 1 }).limit(usersToAdmit);
           
           if (topWaitingUsers.length > 0) {
-            console.log(`🚪 Hàng chờ: Đang mở cổng cho ${topWaitingUsers.length} người vào mua vé...`);
+            console.log(`*** Hàng chờ: Đang mở cổng cho ${topWaitingUsers.length} người vào mua vé...`);
             const userIds = topWaitingUsers.map(u => u._id);
             // Thăng cấp trạng thái cho họ
             await Queue.updateMany({ _id: { $in: userIds } }, { $set: { status: 'allowed' } });

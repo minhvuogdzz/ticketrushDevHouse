@@ -5,7 +5,7 @@ const seatController = require('../controllers/seatController');
 // Lấy danh sách toàn bộ ghế
 router.get('/', seatController.getAllSeats);
 
-// Seed dữ liệu (chỉ dùng lúc đầu)
+// Seed dữ liệu
 router.post('/seed', seatController.seedSeats);
 
 // Các thao tác liên quan đến giữ vé, hủy vé và thanh toán

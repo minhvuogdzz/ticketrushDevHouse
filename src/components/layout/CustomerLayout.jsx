@@ -46,7 +46,7 @@ const CustomerLayout = () => {
     return () => clearInterval(interval);
   }, [user]);
 
-  // ĐÃ FIX: Bổ sung logic xé vé Hàng chờ ảo khi bị ép đăng xuất
+  // Bổ sung logic xé vé Hàng chờ ảo khi bị ép đăng xuất
   const handleForceLogout = async () => {
     if (user && user.userId) {
       try {

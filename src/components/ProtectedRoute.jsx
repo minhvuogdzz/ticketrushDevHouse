@@ -6,13 +6,13 @@ const ProtectedRoute = () => {
   const userString = localStorage.getItem('ticketrush_user');
   const user = userString ? JSON.parse(userString) : null;
 
-  // 2. Chặn cửa 1: Chưa đăng nhập hoặc không có data -> Đuổi về Trang chủ
+  // 2. Chặn cửa 1: Chưa đăng nhập hoặc không có data ép về Trang chủ
   if (!user) {
     alert("Bạn chưa đăng nhập!"); // Thêm cái thông báo cho biết lý do bị chặn
     return <Navigate to="/" replace />;
   }
 
-  // 3. Chặn cửa 2: Đăng nhập rồi nhưng đéo phải Admin -> Đuổi về Trang chủ
+  // 3. Chặn cửa 2: khác admin ép về Trang chủ
   if (user.role !== 'admin') {
     alert("Khu vực cấm! Bạn không có quyền Admin.");
     return <Navigate to="/" replace />;

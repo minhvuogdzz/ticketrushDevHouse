@@ -92,7 +92,7 @@ exports.getAllSeats = async (req, res) => {
   try {
     const now = new Date();
 
-    // 1. NGƯỜI QUÉT RÁC: Tìm tất cả các ghế đang giữ chỗ (locked) mà đã quá hạn 10 phút
+    // 1. Tìm tất cả các ghế đang giữ chỗ (locked) mà đã quá hạn 10 phút
     const expiredSeats = await Seat.find({ status: 'locked', lockExpires: { $lt: now } });
     
     // Nếu có ghế quá hạn -> Giải phóng chúng ngay lập tức để người khác mua
